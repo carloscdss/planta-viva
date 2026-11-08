@@ -10,7 +10,7 @@ export class Componente {
   constructor(descriptor) {
     exigirDescriptorValido(descriptor);
     this.id = crearId();
-    this.tag = descriptor.tag ?? `${descriptor.tipo.toUpperCase()}-${this.id.slice(-4)}`;
+    this.tag = `${descriptor.tag ?? descriptor.tipo.toUpperCase()}-${this.id.slice(-4)}`;
     this.tipo = descriptor.tipo;
     this.descriptorId = descriptor.id;
     this.dimensiones = { ...descriptor.dimensiones };

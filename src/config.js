@@ -6,6 +6,5 @@ export const CONFIG = Object.freeze({
   cameraFov: 45,
   minComponentDimension: 0.05,
   maxComponentDimension: 100,
-  snapDistance: 0.25,
-  catalog: Object.freeze({ cabinet: 'gabinete-base' })
+  snapDistance: 0.75
 });
