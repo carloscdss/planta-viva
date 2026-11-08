@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#101820" />
     <meta name="description" content="Editor y simulador de planta industrial 3D" />
     <title>Planta Viva — Editor 3D</title>
@@ -20,30 +20,43 @@
       * { box-sizing: border-box; }
       html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101820; }
       body { color: #e8f0f2; }
-      #app { width: 100%; height: 100%; position: relative; }
+      #app { width: 100%; height: 100vh; height: 100dvh; min-height: 320px; position: relative; overflow: hidden; }
       canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-      .topbar { position: absolute; z-index: 2; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; pointer-events: none; }
-      .brand, .toolbar button, .toolbar select, .hint, #data-panel, #status { border: 1px solid #ffffff1c; background: #101820ed; box-shadow: 0 8px 24px #0005; backdrop-filter: blur(12px); }
+      .topbar { position: absolute; z-index: 2; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; }
+      .brand, .toolbar button, .toolbar select, .hint, #data-panel, #status, .walk-pad button { border: 1px solid #ffffff24; background: #101820ed; box-shadow: 0 8px 24px #0005; backdrop-filter: blur(12px); }
       .brand { border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
       .brand span { color: #53d6a4; }
-      .toolbar { display: flex; gap: 8px; pointer-events: auto; }
-      .toolbar button, .toolbar select { color: #e8f0f2; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 13px; }
+      .toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; pointer-events: auto; }
+      .toolbar button, .toolbar select { min-height: 42px; color: #e8f0f2; border-radius: 10px; padding: 9px 11px; font: inherit; font-size: 13px; }
       .toolbar button { cursor: pointer; }
-      .toolbar button:active { background: #29413e; }
+      .toolbar button:active, .walk-pad button:active { background: #29413e; }
       .toolbar select { max-width: 180px; }
-      .hint { position: absolute; z-index: 2; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 10px 14px; border-radius: 12px; color: #c4d2d5; font-size: 12px; text-align: center; white-space: nowrap; }
-      #status { position: absolute; z-index: 2; top: 68px; left: 12px; padding: 8px 11px; border-radius: 10px; color: #b6f4d8; font-size: 12px; pointer-events: none; }
-      #data-panel { display: none; position: absolute; z-index: 3; inset: 108px 12px 64px; padding: 14px; border-radius: 12px; overflow: auto; color: #b6f4d8; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+      #status { position: absolute; z-index: 2; top: 68px; left: 12px; max-width: min(520px, calc(100% - 24px)); padding: 8px 11px; border-radius: 10px; color: #b6f4d8; font-size: 12px; line-height: 1.35; pointer-events: none; }
+      .hint { position: absolute; z-index: 2; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); padding: 10px 14px; border-radius: 12px; color: #c4d2d5; font-size: 12px; line-height: 1.4; text-align: center; }
+      #data-panel { display: none; position: absolute; z-index: 3; inset: 118px 12px 64px; padding: 14px; border-radius: 12px; overflow: auto; color: #b6f4d8; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
       #data-panel.open { display: block; }
-      @media (max-width: 560px) {
-        .topbar { align-items: flex-start; flex-wrap: wrap; }
-        .brand { padding: 8px 10px; font-size: 12px; }
-        .toolbar { margin-left: auto; gap: 5px; }
-        .toolbar button, .toolbar select { padding: 8px 9px; font-size: 11px; }
-        .toolbar select { max-width: 130px; }
-        #status { top: 54px; }
-        #data-panel { inset: 94px 12px 64px; }
-        .hint { font-size: 10px; white-space: normal; }
+      .walk-pad { display: none; position: absolute; z-index: 2; bottom: max(78px, calc(env(safe-area-inset-bottom) + 70px)); left: max(14px, env(safe-area-inset-left)); width: 132px; height: 132px; pointer-events: none; grid-template: repeat(3, 1fr) / repeat(3, 1fr); gap: 5px; }
+      .walk-pad.visible { display: grid; }
+      .walk-pad button { pointer-events: auto; touch-action: none; color: #e8f0f2; border-radius: 12px; font-size: 20px; }
+      .walk-pad [data-move="forward"] { grid-area: 1 / 2; }
+      .walk-pad [data-move="left"] { grid-area: 2 / 1; }
+      .walk-pad [data-move="backward"] { grid-area: 2 / 2; }
+      .walk-pad [data-move="right"] { grid-area: 2 / 3; }
+      @media (max-width: 700px) {
+        .topbar { display: grid; grid-template-columns: 1fr; gap: 7px; }
+        .brand { justify-self: start; padding: 8px 10px; font-size: 12px; }
+        .toolbar { justify-content: flex-start; gap: 5px; }
+        .toolbar button, .toolbar select { min-height: 38px; padding: 7px 8px; font-size: 11px; }
+        .toolbar select { max-width: 128px; }
+        #status { top: 108px; left: 10px; right: 10px; max-width: none; width: fit-content; padding: 7px 9px; font-size: 11px; }
+        #data-panel { inset: 154px 10px 72px; }
+        .hint { bottom: max(10px, env(safe-area-inset-bottom)); font-size: 10px; }
+      }
+      @media (max-width: 380px) {
+        .toolbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+        .toolbar button, .toolbar select { width: 100%; max-width: none; padding-inline: 5px; font-size: 10px; }
+        #status { top: 151px; }
+        #data-panel { inset: 195px 10px 72px; }
       }
     </style>
   </head>
@@ -54,12 +67,24 @@
         <nav class="toolbar" aria-label="Herramientas">
           <select id="component-type" aria-label="Familia de componente"></select>
           <button id="add-component" type="button">＋ Colocar</button>
+          <select id="camera-mode" aria-label="Modo de cámara">
+            <option value="third">3ª persona</option>
+            <option value="first">1ª persona</option>
+          </select>
+          <button id="zoom-out" type="button" aria-label="Alejar cámara">−</button>
+          <button id="zoom-in" type="button" aria-label="Acercar cámara">＋</button>
           <button id="toggle-data" type="button" aria-label="Mostrar u ocultar datos">JSON</button>
         </nav>
       </header>
       <div id="status" role="status">Elige una familia y toca el plano para colocarla.</div>
       <div id="data-panel" aria-live="polite"></div>
-      <div class="hint">Arrastra para orbitar · Pellizca para zoom · Toca para colocar · Los puertos compatibles se acoplan</div>
+      <div id="walk-pad" class="walk-pad" aria-label="Controles de movimiento">
+        <button type="button" data-move="forward" aria-label="Avanzar">▲</button>
+        <button type="button" data-move="left" aria-label="Mover a la izquierda">◀</button>
+        <button type="button" data-move="backward" aria-label="Retroceder">▼</button>
+        <button type="button" data-move="right" aria-label="Mover a la derecha">▶</button>
+      </div>
+      <div class="hint">3ª persona: arrastra para orbitar · Pellizca o usa ± para zoom · 1ª persona: arrastra para mirar y usa WASD o el pad · Toca para colocar</div>
     </main>
     <script type="module" src="./src/main.js"></script>
   </body>
