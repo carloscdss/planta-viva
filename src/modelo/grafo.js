@@ -1,3 +1,5 @@
+import { Conexion } from './conexion.js';
+
 export class Grafo {
   #componentes = new Map();
   #conexiones = new Map();
@@ -22,13 +24,14 @@ export class Grafo {
     if (a.tipo !== b.tipo) throw new Error('Los puertos no son compatibles.');
     if (a.conectadoA || b.conectadoA) throw new Error('Uno de los puertos ya está conectado.');
 
+    const conexion = new Conexion({
+      puertoA: a,
+      puertoB: b,
+      componenteA: componente1,
+      componenteB: componente2
+    });
+
     const id = `${componenteA}:${puertoA}--${componenteB}:${puertoB}`;
-    const conexion = {
-      id,
-      tipo: a.tipo,
-      extremoA: { componenteId: componenteA, puertoId: puertoA },
-      extremoB: { componenteId: componenteB, puertoId: puertoB }
-    };
     a.conectadoA = { componenteId: componenteB, puertoId: puertoB };
     b.conectadoA = { componenteId: componenteA, puertoId: puertoA };
     this.#conexiones.set(id, conexion);
@@ -38,7 +41,7 @@ export class Grafo {
   aJSON() {
     return {
       componentes: this.listar().map((componente) => componente.aJSON()),
-      conexiones: this.listarConexiones()
+      conexiones: this.listarConexiones().map((conexion) => conexion.aJSON())
     };
   }
 }
