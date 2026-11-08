@@ -1,37 +1,72 @@
-import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 
-export function huella(componente) {
-  const d = componente.dimensiones ?? componente.descriptor?.dimensiones ?? {};
-  let w = Number(d.ancho ?? 0.6);
-  let depth = Number(d.profundidad ?? d.fondo ?? d.diametro ?? 0.6);
-  const yaw = componente.grupo?.rotation?.y ?? componente.rotacionY ?? 0;
-  if (Math.abs(Math.sin(yaw)) > 0.5) [w, depth] = [depth, w];
-  return { w, d: depth };
+function huella(componente) {
+  const dimensiones = componente.dimensiones ?? componente.descriptor?.dimensiones ?? {};
+  let ancho = Number(dimensiones.ancho ?? 0.6);
+  let fondo = Number(dimensiones.profundidad ?? dimensiones.fondo ?? dimensiones.diametro ?? 0.6);
+  const rotacionY = componente.grupo?.rotation?.y ?? componente.rotacionY ?? 0;
+  if (Math.abs(Math.sin(rotacionY)) > 0.5) [ancho, fondo] = [fondo, ancho];
+  return { ancho, fondo };
 }
 
-function caja(centro, dim) { return { minX:centro.x-dim.w/2,maxX:centro.x+dim.w/2,minZ:centro.z-dim.d/2,maxZ:centro.z+dim.d/2 }; }
+function caja(posicion, dimensiones) {
+  return {
+    minX: posicion.x - dimensiones.ancho / 2,
+    maxX: posicion.x + dimensiones.ancho / 2,
+    minZ: posicion.z - dimensiones.fondo / 2,
+    maxZ: posicion.z + dimensiones.fondo / 2
+  };
+}
 
+/** Devuelve el componente que colisiona, o null si la huella está libre. */
 export function solapa(grafo, candidato, posicion, idExcluido = null) {
-  const nuevo = caja(posicion, huella(candidato));
+  const nueva = caja(posicion, huella(candidato));
   const margen = CONFIG.edicion.margenSolape;
-  for (const otro of grafo.listar()) {
-    if (otro.id === idExcluido) continue;
-    const b = caja(otro.grupo.position, huella(otro));
-    if (nuevo.minX < b.maxX + margen && nuevo.maxX > b.minX - margen && nuevo.minZ < b.maxZ + margen && nuevo.maxZ > b.minZ - margen) return otro;
+
+  for (const existente of grafo.listar()) {
+    if (existente.id === idExcluido) continue;
+    const otra = caja(existente.grupo.position, huella(existente));
+    const intersecaX = nueva.minX < otra.maxX + margen && nueva.maxX > otra.minX - margen;
+    const intersecaZ = nueva.minZ < otra.maxZ + margen && nueva.maxZ > otra.minZ - margen;
+    if (intersecaX && intersecaZ) return existente;
   }
   return null;
 }
 
-export function ajustarAEquipos(grafo, posicion, dim) {
-  const radio=CONFIG.edicion.radioSnap, p=posicion.clone();
-  let bx=null,bz=null,dx=radio,dz=radio;
-  for (const c of grafo.listar()) {
-    const o=caja(c.grupo.position,huella(c));
-    for(const x of [o.minX-dim.w/2,o.maxX+dim.w/2]) { const d=Math.abs(p.x-x); if(d<dx&&p.z>=o.minZ-dim.d/2&&p.z<=o.maxZ+dim.d/2){dx=d;bx=x;} }
-    for(const z of [o.minZ-dim.d/2,o.maxZ+dim.d/2]) { const d=Math.abs(p.z-z); if(d<dz&&p.x>=o.minX-dim.w/2&&p.x<=o.maxX+dim.w/2){dz=d;bz=z;} }
+/** Ajusta los ejes X/Z a los bordes de equipos cercanos sin mover la altura. */
+export function ajustarAEquipos(grafo, posicion, dimensiones) {
+  const radio = CONFIG.edicion.radioSnap;
+  const resultado = posicion.clone();
+  let mejorX = null;
+  let mejorZ = null;
+  let distanciaX = radio;
+  let distanciaZ = radio;
+
+  for (const existente of grafo.listar()) {
+    const otra = caja(existente.grupo.position, huella(existente));
+    const xCandidatos = [otra.minX - dimensiones.ancho / 2, otra.maxX + dimensiones.ancho / 2];
+    const zCandidatos = [otra.minZ - dimensiones.fondo / 2, otra.maxZ + dimensiones.fondo / 2];
+
+    for (const x of xCandidatos) {
+      const distancia = Math.abs(resultado.x - x);
+      const alineadoZ = resultado.z + dimensiones.fondo / 2 > otra.minZ && resultado.z - dimensiones.fondo / 2 < otra.maxZ;
+      if (distancia < distanciaX && alineadoZ) { distanciaX = distancia; mejorX = x; }
+    }
+    for (const z of zCandidatos) {
+      const distancia = Math.abs(resultado.z - z);
+      const alineadoX = resultado.x + dimensiones.ancho / 2 > otra.minX && resultado.x - dimensiones.ancho / 2 < otra.maxX;
+      if (distancia < distanciaZ && alineadoX) { distanciaZ = distancia; mejorZ = z; }
+    }
   }
-  if(bx!==null)p.x=bx; if(bz!==null)p.z=bz; return p;
+
+  if (mejorX !== null) resultado.x = mejorX;
+  if (mejorZ !== null) resultado.z = mejorZ;
+  return resultado;
 }
 
-export function ajustarAGrilla(valor) { const paso=CONFIG.edicion.pasoRejilla; return Math.round(valor/paso)*paso; }
+export function ajustarAGrilla(valor) {
+  const paso = CONFIG.edicion.pasoRejilla;
+  return Math.round(valor / paso) * paso;
+}
+
+export { huella };
