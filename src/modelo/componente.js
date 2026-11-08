@@ -13,10 +13,9 @@ export class Componente {
     this.tag = `${descriptor.tag ?? descriptor.tipo.toUpperCase()}-${this.id.slice(-4)}`;
     this.tipo = descriptor.tipo;
     this.familia = descriptor.familia ?? descriptor.tipo;
+    this.params = descriptor.params ?? {};
     this.descriptorId = descriptor.id;
     this.dimensiones = { ...descriptor.dimensiones };
-    this.params = {};
-    this.area = Number((this.dimensiones.ancho * this.dimensiones.profundidad).toFixed(2));
     this.puertos = (descriptor.puertos ?? []).map((puerto) => new Puerto(puerto));
     this.grupo = new THREE.Group();
     this.grupo.name = this.tag;
@@ -28,15 +27,14 @@ export class Componente {
     return {
       id: this.id,
       familia: this.familia,
-      tipo: this.tipo,
-      descriptorId: this.descriptorId,
       tag: this.tag,
-      params: { ...this.params },
+      tipo: this.tipo,
+      params: this.params,
+      descriptorId: this.descriptorId,
       dimensiones: { ...this.dimensiones },
       posicion: this.grupo.position.toArray(),
-      rotacionY: this.grupo.rotation.y,
-      puertos: this.puertos.map((puerto) => puerto.aJSON(this.id)),
-      area: this.area
+      rotacion: this.grupo.rotation.toArray(),
+      puertos: this.puertos.map((puerto) => puerto.aJSON(this.id))
     };
   }
 }
