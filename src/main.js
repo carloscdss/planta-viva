@@ -55,11 +55,13 @@ let hud;
 
 function aviso(texto, error = false) { hud.aviso(texto, error); }
 function actualizarPanelDatos() { panelDatos.textContent = JSON.stringify(grafo.aJSON(), null, 2); }
+
 function ponerNDC(evento) {
   const rect = renderer.domElement.getBoundingClientRect();
   puntero.set(((evento.clientX - rect.left) / rect.width) * 2 - 1, -((evento.clientY - rect.top) / rect.height) * 2 + 1);
   rayo.setFromCamera(puntero, camara);
 }
+
 function liberarGrupo(grupo) {
   grupo.traverse((objeto) => {
     objeto.geometry?.dispose();
@@ -67,6 +69,7 @@ function liberarGrupo(grupo) {
     else objeto.material?.dispose();
   });
 }
+
 function limpiarFantasma() {
   if (!fantasma) return;
   escena.remove(fantasma.grupo);
@@ -75,6 +78,7 @@ function limpiarFantasma() {
   posicionValida = false;
   haySolape = false;
 }
+
 function crearFantasma() {
   limpiarFantasma();
   if (!familiaActiva) return;
@@ -88,11 +92,13 @@ function crearFantasma() {
   escena.add(fantasma.grupo);
   actualizarVisibilidadPuertos(modoConexiones);
 }
+
 function actualizarVisibilidadPuertos(visible) {
   escena.traverse((objeto) => {
     if (objeto.userData?.puerto === true) objeto.visible = visible;
   });
 }
+
 function actualizarColorFantasma() {
   if (!fantasma) return;
   const color = haySolape ? 0x8a3b3b : 0xffffff;
@@ -102,6 +108,7 @@ function actualizarColorFantasma() {
     for (const material of materiales) if (material.color) material.color.setHex(color);
   });
 }
+
 function actualizarFantasma(evento) {
   if (!fantasma || !familiaActiva) return;
   ponerNDC(evento);
@@ -119,11 +126,13 @@ function actualizarFantasma(evento) {
   posicionValida = !haySolape;
   actualizarColorFantasma();
 }
+
 function obtenerComponenteDesdeObjeto(objeto) {
   let actual = objeto;
   while (actual && !actual.userData.componenteId) actual = actual.parent;
   return actual ? grafo.obtener(actual.userData.componenteId) : null;
 }
+
 function seleccionarEn(evento) {
   ponerNDC(evento);
   const hits = rayo.intersectObjects(grafo.listar().map((componente) => componente.grupo), true);
@@ -133,12 +142,14 @@ function seleccionarEn(evento) {
   hud.mostrarPropiedades(componente);
   return { componente, objeto: hit?.object ?? null };
 }
+
 function alternarModoConexiones(activo) {
   modoConexiones = activo;
   puertoPendiente = null;
   actualizarVisibilidadPuertos(activo);
   aviso(activo ? 'Modo conexiones activo' : 'Modo conexiones desactivado');
 }
+
 function colocarComponente() {
   if (!fantasma || !fantasma.grupo.visible) { aviso('Mueve el puntero sobre el plano para elegir una posición', true); return; }
   if (haySolape || !posicionValida) { aviso('No se puede colocar: la huella choca con otro equipo', true); return; }
@@ -151,8 +162,9 @@ function colocarComponente() {
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
   actualizarPanelDatos();
-  aviso(`${componente.tag} colocado`);
+  aviso(`${componente.nombre ?? componente.descriptor?.nombre ?? componente.tipo} colocado`);
 }
+
 function procesarSeleccionDePuerto(componente, objeto) {
   const puerto = componente?.puertos.find((item) => item.id === objeto?.userData.portId);
   if (!puerto) { aviso('Selecciona un puerto visible para iniciar la conexión', true); return; }
@@ -167,16 +179,19 @@ function procesarSeleccionDePuerto(componente, objeto) {
     aviso(`Conexión ${puerto.tipo} creada`);
   } catch (error) { aviso(error.message || 'No se pudo crear la conexión', true); }
 }
-function exportarJSON() {
+
+async function exportarJSON() {
   const json = JSON.stringify(grafo.aJSON(), null, 2);
+  console.log('Planta Viva — grafo JSON:', json);
   actualizarPanelDatos();
-  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-  const enlace = document.createElement('a');
-  enlace.href = url;
-  enlace.download = 'planta-viva.json';
-  enlace.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-  aviso(`JSON exportado (${grafo.listar().length} componentes)`);
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard API no disponible');
+    await navigator.clipboard.writeText(json);
+    aviso('JSON del grafo copiado al portapapeles');
+  } catch (error) {
+    aviso('JSON impreso en consola; el navegador no permitió copiarlo', true);
+    console.warn('No se pudo copiar el JSON al portapapeles:', error);
+  }
 }
 
 hud = montarHud({
