@@ -275,16 +275,17 @@ function redimensionar() {
 }
 window.addEventListener('resize', redimensionar);
 
-// --- FASE 3: LÓGICA Y ANIMACIÓN DE FLUJO ---
+// --- LÓGICA DE FLUJO (FASE 3) ---
 window.alternarBombeo = () => {
   const conexiones = grafo.listarConexiones();
   if (conexiones.length === 0) {
     hud.aviso('No hay tuberías conectadas para bombear', true);
-    return;
+    return false;
   }
   const nuevoEstado = !conexiones[0].activo;
   conexiones.forEach(c => c.activo = nuevoEstado);
   hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO: El agua está fluyendo' : 'Bombeo DETENIDO');
+  return nuevoEstado; // <-- Devuelve true/false para el botón del HUD
 };
 
 const relojAnimacion = new THREE.Clock();
