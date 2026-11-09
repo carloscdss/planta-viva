@@ -12,6 +12,7 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
       </a>
       <nav class="menu-acciones" aria-label="Herramientas del proyecto">
         <button class="accion" id="btn-conexiones" type="button" aria-pressed="false"><span aria-hidden="true">⌁</span> Conexiones</button>
+        <button class="accion" id="btn-bombear" type="button" style="background: #3b82f6; color: white; border-color: #2563eb;">💧 Bombear</button>
         <button class="accion accion-principal" id="btn-json" type="button"><span aria-hidden="true">⇧</span> Exportar</button>
       </nav>
     </header>
@@ -23,7 +24,7 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
         <label class="buscador-contenedor"><span aria-hidden="true">⌕</span><input id="buscador" class="buscador" type="search" placeholder="Buscar equipo…" aria-label="Buscar equipo"></label>
       </div>
       <div id="lista" class="cajon-lista"></div>
-      <footer class="cajon-pie"><span class="estado-punto"></span> Fase 2 · Diseño de planta</footer>
+      <footer class="cajon-pie"><span class="estado-punto"></span> Fase 3 · Simulación de flujo</footer>
     </aside>
     <section id="propiedades" class="propiedades oculto" aria-live="polite" aria-label="Propiedades del equipo seleccionado"></section>
     <div id="avisos" class="avisos" aria-live="polite" aria-atomic="true"></div>
@@ -38,7 +39,6 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   const botonMenu = hud.querySelector('#btn-catalogo');
   const fondo = hud.querySelector('#fondo-cajon');
   const escapar = (valor) => String(valor ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const iconoFamilia = (familia) => ({ gabinete: '▤', bomba: '◉', tuberia: '⟷', tanque: '▣', valvula: '◉', intercambiador: '◈', motor: '⚙' })[familia] ?? '⟷';
 
   function abrirCajon(abierto) {
     drawer.classList.toggle('abierto', abierto);
@@ -114,7 +114,7 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
       const titulo = document.createElement('h3'); titulo.className = 'cat-titulo'; titulo.textContent = categoria; lista.append(titulo);
       for (const definicion of definiciones) {
         const fila = document.createElement('button'); fila.type = 'button'; fila.className = 'fila'; fila.setAttribute('aria-expanded', 'false');
-        fila.innerHTML = `<span class="equipo-icono" aria-hidden="true">${iconoFamilia(definicion.familia)}</span><span class="nombre">${escapar(definicion.nombre)}<small>${escapar(definicion.descripcion)}</small></span><span class="cod">${escapar(definicion.codigo)}</span><span class="chev" aria-hidden="true">＋</span>`;
+        fila.innerHTML = `<span class="equipo-icono" aria-hidden="true">${definicion.familia === 'gabinete' ? '▤' : definicion.familia === 'bomba' ? '◉' : '⟷'}</span><span class="nombre">${escapar(definicion.nombre)}<small>${escapar(definicion.descripcion)}</small></span><span class="cod">${escapar(definicion.codigo)}</span><span class="chev" aria-hidden="true">＋</span>`;
         const ficha = crearFicha(definicion);
         fila.addEventListener('click', () => {
           const abierta = fila.getAttribute('aria-expanded') === 'true';
@@ -131,7 +131,7 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   function mostrarPropiedades(componente) {
     if (!componente) { propiedades.classList.add('oculto'); propiedades.replaceChildren(); return; }
     const definicion = catalogo.find((item) => item.id === componente.descriptorId);
-    propiedades.innerHTML = `<button class="accion cerrar" type="button" aria-label="Cerrar propiedades">×</button><span class="sobretitulo">EQUIPO SELECCIONADO</span><h2>${escapar(componente.nombre)}</h2><p>${escapar(definicion?.codigo ?? componente.tag)}</p><dl><div><dt>Familia</dt><dd>${escapar(componente.familia)}</dd></div><div><dt>Área</dt><dd>${escapar(componente.area)} m²</dd></div><div><dt>Puertos</dt><dd>${componente.puertos.length}</dd></div></dl>`;
+    propiedades.innerHTML = `<button class="accion cerrar" type="button" aria-label="Cerrar propiedades">×</button><span class="sobretitulo">EQUIPO SELECCIONADO</span><h2>${escapar(componente.nombre ?? definicion?.nombre ?? componente.tipo)}</h2><span class="tag">${escapar(componente.tag)}</span><dl><dt>Familia</dt><dd>${escapar(componente.familia)}</dd><dt>Dimensiones</dt><dd>${escapar(componente.dimensiones.ancho)} × ${escapar(componente.dimensiones.alto)} × ${escapar(componente.dimensiones.profundidad)} m</dd><dt>Puertos</dt><dd>${componente.puertos.length}</dd></dl>`;
     propiedades.querySelector('.cerrar').addEventListener('click', () => mostrarPropiedades(null));
     propiedades.classList.remove('oculto');
   }
@@ -151,6 +151,15 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
     hud.querySelector('#leyenda').classList.toggle('oculto', !activo);
     alCambiarModo?.(activo);
   });
-  pintarCatalogo();
-  return { aviso: avisar, mostrarPropiedades, abrirCajon };
+  
+  // Botón de Bombeo
+  hud.querySelector('#btn-bombear').addEventListener('click', () => {
+    if (window.alternarBombeo) window.alternarBombeo();
+  });
+
+  return {
+    aviso: avisar,
+    mostrarPropiedades,
+    abrirCajon
+  };
 }
