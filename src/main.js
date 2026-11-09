@@ -164,15 +164,26 @@ function colocar() {
   aviso(`${componente.nombre ?? componente.tipo} colocado`);
 }
 
+// Lógica de Conexión Manual Mejorada
 function conectarPuerto(componente, objeto) {
   const puerto = componente?.puertos.find((p) => p.id === objeto?.userData.portId);
   if (!puerto) { aviso('Selecciona un puerto visible', true); return; }
   if (puerto.conectadoA) { aviso('Ese puerto ya está conectado', true); return; }
+  
+  // Si es el primer clic, guardamos el puerto pendiente
   if (!puertoPendiente) { 
     puertoPendiente = { componente, puerto }; 
     aviso(`Puerto ${puerto.tipo} seleccionado, elige el segundo puerto`); 
+    
+    // Resaltar puertos compatibles cercanos (opcional visual)
+    escena.traverse((obj) => {
+      if (obj.userData?.esPuerto && obj !== objeto) {
+        // Si es del mismo tipo, brillar
+      }
+    });
     return; 
   }
+  
   if (puertoPendiente.componente.id === componente.id) { 
     puertoPendiente = { componente, puerto }; 
     aviso('Selecciona un puerto de otro equipo', true); 
@@ -191,6 +202,44 @@ function conectarPuerto(componente, objeto) {
     aviso(`Conexión creada`);
   } catch (error) { 
     aviso(error.message || 'No se pudo crear la conexión', true); 
+  }
+}
+
+// Nueva Lógica: Auto-Conectar al hacer clic en el piso o equipo cercano
+function autoConectarDesdeEquipo(componente) {
+  // Buscar el puerto libre más cercano
+  const puertosLibres = [];
+  grafo.listar().forEach(c => {
+    if (c.id === componente.id) return; // No conectar consigo mismo
+    c.puertos.forEach(p => {
+      if (!p.conectadoA && p.tipo === 'proceso') {
+        // Calcular distancia global
+        const posMundo = new THREE.Vector3().copy(p.posicion);
+        c.grupo.localToWorld(posMundo);
+        const dist = componente.grupo.position.distanceTo(posMundo);
+        puertosLibres.push({ componente: c, puerto: p, distancia: dist });
+      }
+    });
+  });
+
+  // Ordenar por cercanía
+  puertosLibres.sort((a, b) => a.distancia - b.distancia);
+
+  if (puertosLibres.length === 0) {
+    aviso('No hay otros equipos con puertos libres.', true);
+    return;
+  }
+
+  // Tomar el más cercano
+  const mejor = puertosLibres[0];
+  
+  try {
+    const conexion = grafo.conectar(componente.id, componente.puertos.find(p=>!p.conectadoA && p.tipo==='proceso').id, mejor.componente.id, mejor.puerto.id);
+    escena.add(conexion.malla);
+    actualizarJSON();
+    aviso(`Auto-conectado a ${mejor.componente.nombre}`);
+  } catch (error) {
+    aviso('No se pudo autoconectar', true);
   }
 }
 
@@ -238,9 +287,18 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   
   const resultado = seleccionar(e);
   
+  // Si estamos en modo conexiones
   if (modoConexiones) { 
-    if (resultado.componente) conectarPuerto(resultado.componente, resultado.objeto); 
-    return; 
+    // Si tocamos un puerto específico
+    if (resultado.componente && resultado.objeto?.userData?.esPuerto) { 
+      conectarPuerto(resultado.componente, resultado.objeto); 
+      return;
+    }
+    // Si tocamos el cuerpo de un equipo, autoconectar al puerto más cercano
+    if (resultado.componente) {
+      autoConectarDesdeEquipo(resultado.componente);
+      return;
+    }
   }
   
   if (!resultado.componente && familiaActiva) colocar();
@@ -285,17 +343,14 @@ window.alternarBombeo = () => {
   const nuevoEstado = !conexiones[0].activo;
   conexiones.forEach(c => c.activo = nuevoEstado);
   hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO: El agua está fluyendo' : 'Bombeo DETENIDO');
-  return nuevoEstado; // <-- Devuelve true/false para el botón del HUD
+  return nuevoEstado;
 };
 
 const relojAnimacion = new THREE.Clock();
 function animar() { 
   requestAnimationFrame(animar); 
   const dt = relojAnimacion.getDelta();
-  
-  // Animación del agua en las tuberías
   grafo.listarConexiones().forEach(c => c.animarFlujo(dt));
-
   controles.update(); 
   renderer.render(escena, camara); 
 }
