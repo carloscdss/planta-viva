@@ -110,6 +110,8 @@ export function crearComponente(catalogId, { fantasma = false, params = {} } = {
   componente.familia = base.familia;
   componente.nombre = base.nombre;
   componente.params = { ...Object.fromEntries(Object.entries(base.campos ?? {}).map(([clave, spec]) => [clave, spec.defecto])), ...params };
+  if (componente.familia === 'bomba' && componente.params.encendida === undefined) componente.params.encendida = false;
+  if (componente.familia === 'valvula' && componente.params.abierta === undefined) componente.params.abierta = true;
   componente.area = Number((dimensiones.ancho * dimensiones.profundidad).toFixed(2));
   crearCuerpo(componente, fantasma);
   componente.grupo.userData.fantasma = fantasma;

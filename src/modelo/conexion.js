@@ -8,6 +8,7 @@ export class Conexion {
     this.componenteA = componenteA;
     this.componenteB = componenteB;
     this.activo = false;
+    this.sentidoFlujo = 1;
     
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -63,7 +64,7 @@ export class Conexion {
   animarFlujo(dt) {
     if (this.activo) {
       this.malla.material = this.materialFlujo;
-      this.textura.offset.x -= dt * 1.5;
+      this.textura.offset.x -= dt * 1.5 * this.sentidoFlujo;
     } else {
       this.malla.material = this.materialNormal;
     }
