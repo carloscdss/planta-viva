@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 
 const puerto = (id, posicion, direccion) => Object.freeze({
@@ -28,3 +29,21 @@ export const descriptorTuberia = Object.freeze({
     puerto('salida', { x: 1, y: 0, z: 0 }, { x: 1, y: 0, z: 0 })
   ])
 });
+
+export function dibujarTuberia(componente, { THREE: three, materiales, fantasma }) {
+  const radio = Number(componente.params.diametro ?? componente.descriptor.dimensiones.alto) / 2;
+  const longitud = Number(componente.params.longitud ?? componente.descriptor.dimensiones.ancho);
+  const material = fantasma ? componente._materialFantasma ??= new three.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, depthWrite: false }) : new three.MeshStandardMaterial({ color: componente.descriptor.color, metalness: 0.42, roughness: 0.48 });
+  const agregar = (geometria, posicion = [0, 0, 0], materialMalla = material) => {
+    const malla = new three.Mesh(geometria, materialMalla);
+    malla.position.set(...posicion);
+    malla.castShadow = !fantasma;
+    malla.receiveShadow = !fantasma;
+    componente.grupo.add(malla);
+    return malla;
+  };
+  agregar(new three.CylinderGeometry(radio, radio, longitud, 24), [0, 0, 0]).rotation.z = Math.PI / 2;
+  for (const x of [-longitud / 2, longitud / 2]) {
+    agregar(new three.CylinderGeometry(radio * 1.35, radio * 1.35, 0.08, 24), [x, 0, 0], materiales.estructura).rotation.z = Math.PI / 2;
+  }
+}

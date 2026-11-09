@@ -2,14 +2,36 @@ import * as THREE from 'three';
 import { materiales, crearMaterialFantasma } from '../nucleo/materiales.js';
 import { Componente } from '../modelo/componente.js';
 import { CONFIG } from '../config.js';
-import { descriptorGabinete } from './gabinete.js';
-import { descriptorBomba } from './bomba.js';
-import { descriptorTuberia } from './tuberia.js';
+import { descriptorGabinete, dibujarGabinete } from './gabinete.js';
+import { descriptorBomba, dibujarBomba } from './bomba.js';
+import { descriptorTuberia, dibujarTuberia } from './tuberia.js';
+import { descriptorTanque, dibujarTanque } from './tanque.js';
+import { descriptorValvula, dibujarValvula } from './valvula.js';
+import { descriptorIntercambiador, dibujarIntercambiador } from './intercambiador.js';
+import { descriptorMotor, dibujarMotor } from './motor.js';
 
-const definicionesIniciales = [descriptorGabinete, descriptorBomba, descriptorTuberia];
+// Registro central: cada familia conserva su descriptor y su dibujo en su propio módulo.
+const definicionesIniciales = [
+  descriptorGabinete,
+  descriptorBomba,
+  descriptorTuberia,
+  descriptorTanque,
+  descriptorValvula,
+  descriptorIntercambiador,
+  descriptorMotor
+];
 export const catalogo = [...definicionesIniciales];
 const porId = new Map();
 const porFamilia = new Map();
+const dibujantes = new Map([
+  ['gabinete', dibujarGabinete],
+  ['bomba', dibujarBomba],
+  ['tuberia', dibujarTuberia],
+  ['tanque', dibujarTanque],
+  ['valvula', dibujarValvula],
+  ['intercambiador', dibujarIntercambiador],
+  ['motor', dibujarMotor]
+]);
 
 function indexar(definicion) {
   porId.set(definicion.id, definicion);
@@ -45,58 +67,24 @@ export function obtenerDescriptor(id) {
   return descriptor;
 }
 
+function agregarPuerto(componente, puertoDef) {
+  const marcador = new THREE.Mesh(
+    new THREE.SphereGeometry(Math.max(0.045, (puertoDef.diametro ?? 0.1) * 0.55), 12, 10),
+    new THREE.MeshBasicMaterial({ color: CONFIG.puertos[puertoDef.tipo] ?? 0xffffff, depthTest: false })
+  );
+  marcador.position.set(puertoDef.posicion.x, puertoDef.posicion.y, puertoDef.posicion.z);
+  marcador.userData.portId = puertoDef.id;
+  marcador.userData.puerto = true;
+  marcador.userData.esPuerto = true;
+  marcador.visible = false;
+  componente.grupo.add(marcador);
+}
+
 function crearCuerpo(componente, fantasma) {
-  const { tipo, dimensiones: d, color } = componente.descriptor;
-  const material = fantasma ? crearMaterialFantasma() : new THREE.MeshStandardMaterial({ color, metalness: 0.42, roughness: 0.48 });
-  const add = (geometry, position = [0, 0, 0], materialOverride = material) => {
-    const mesh = new THREE.Mesh(geometry, materialOverride);
-    mesh.position.set(...position);
-    mesh.castShadow = !fantasma;
-    mesh.receiveShadow = !fantasma;
-    componente.grupo.add(mesh);
-    return mesh;
-  };
-
-  if (tipo === 'bomba') {
-    add(new THREE.BoxGeometry(1.5, 0.12, 0.72), [0, -0.52, 0], materiales.estructura);
-    add(new THREE.SphereGeometry(0.36, 24, 18), [-0.08, -0.08, 0]);
-    add(new THREE.CylinderGeometry(0.13, 0.13, 0.34, 20), [-0.47, -0.1, 0], materiales.oscuro).rotation.z = Math.PI / 2;
-    add(new THREE.CylinderGeometry(0.12, 0.12, 0.42, 20), [-0.05, 0.28, 0], materiales.oscuro);
-    add(new THREE.CylinderGeometry(0.24, 0.24, 0.64, 24), [0.55, 0.08, 0]).rotation.z = Math.PI / 2;
-    add(new THREE.BoxGeometry(0.34, 0.12, 0.4), [0.55, -0.3, 0], materiales.oscuro);
-  } else if (tipo === 'tuberia') {
-    const radio = Number(componente.params.diametro ?? d.alto) / 2;
-    const longitud = Number(componente.params.longitud ?? d.ancho);
-    add(new THREE.CylinderGeometry(radio, radio, longitud, 24), [0, 0, 0]).rotation.z = Math.PI / 2;
-    for (const x of [-longitud / 2, longitud / 2]) {
-      add(new THREE.CylinderGeometry(radio * 1.35, radio * 1.35, 0.08, 24), [x, 0, 0], materiales.estructura).rotation.z = Math.PI / 2;
-    }
-  } else if (tipo === 'gabinete') {
-    const { ancho, alto, profundidad } = d;
-    add(new THREE.BoxGeometry(ancho, alto, profundidad));
-    const puertas = Math.max(1, Math.min(3, Math.round(componente.params.puertas ?? 1)));
-    const anchoPuerta = ancho * 0.9 / puertas;
-    for (let i = 0; i < puertas; i++) {
-      add(new THREE.BoxGeometry(anchoPuerta, alto * 0.94, profundidad * 0.035), [-ancho * 0.45 + anchoPuerta * (i + 0.5), 0, profundidad / 2 + 0.02], fantasma ? material : materiales.estructura);
-    }
-    if (!fantasma) {
-      add(new THREE.BoxGeometry(0.035, 0.28, 0.045), [ancho * 0.36, 0.05, profundidad / 2 + 0.045], materiales.oscuro);
-      add(new THREE.SphereGeometry(0.035, 16, 12), [-ancho * 0.34, alto * 0.3, profundidad / 2 + 0.045], materiales.indicador);
-    }
-  }
-
-  for (const puertoDef of componente.puertos) {
-    const marcador = new THREE.Mesh(
-      new THREE.SphereGeometry(Math.max(0.045, puertoDef.diametro * 0.55), 12, 10),
-      new THREE.MeshBasicMaterial({ color: CONFIG.puertos[puertoDef.tipo] ?? 0xffffff, depthTest: false })
-    );
-    marcador.position.copy(puertoDef.posicion);
-    marcador.userData.portId = puertoDef.id;
-    marcador.userData.puerto = true;
-    marcador.userData.esPuerto = true;
-    marcador.visible = false;
-    componente.grupo.add(marcador);
-  }
+  const dibujar = dibujantes.get(componente.familia);
+  if (!dibujar) throw new Error(`No hay un dibujante registrado para "${componente.familia}".`);
+  dibujar(componente, { THREE, materiales, crearMaterialFantasma, fantasma });
+  for (const puerto of componente.puertos) agregarPuerto(componente, puerto);
 }
 
 export function crearComponente(catalogId, { fantasma = false, params = {} } = {}) {

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 
 const puerto = (id, posicion, direccion) => Object.freeze({
@@ -25,3 +26,21 @@ export const descriptorBomba = Object.freeze({
     puerto('descarga', { x: -0.05, y: 0.58, z: 0 }, { x: 0, y: 1, z: 0 })
   ])
 });
+
+export function dibujarBomba(componente, { THREE: three, materiales, fantasma }) {
+  const material = fantasma ? componente._materialFantasma ??= new three.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, depthWrite: false }) : new three.MeshStandardMaterial({ color: componente.descriptor.color, metalness: 0.42, roughness: 0.48 });
+  const agregar = (geometria, posicion = [0, 0, 0], materialMalla = material) => {
+    const malla = new three.Mesh(geometria, materialMalla);
+    malla.position.set(...posicion);
+    malla.castShadow = !fantasma;
+    malla.receiveShadow = !fantasma;
+    componente.grupo.add(malla);
+    return malla;
+  };
+  agregar(new three.BoxGeometry(1.5, 0.12, 0.72), [0, -0.52, 0], materiales.estructura);
+  agregar(new three.SphereGeometry(0.36, 24, 18), [-0.08, -0.08, 0]);
+  agregar(new three.CylinderGeometry(0.13, 0.13, 0.34, 20), [-0.47, -0.1, 0], materiales.oscuro).rotation.z = Math.PI / 2;
+  agregar(new three.CylinderGeometry(0.12, 0.12, 0.42, 20), [-0.05, 0.28, 0], materiales.oscuro);
+  agregar(new three.CylinderGeometry(0.24, 0.24, 0.64, 24), [0.55, 0.08, 0]).rotation.z = Math.PI / 2;
+  agregar(new three.BoxGeometry(0.34, 0.12, 0.4), [0.55, -0.3, 0], materiales.oscuro);
+}
