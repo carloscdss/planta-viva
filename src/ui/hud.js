@@ -1,18 +1,29 @@
-export function montarHud({ catalogo, alColocar, alExportar, alCambiarModo }) {
+export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo }) {
   const hud = document.getElementById('hud');
   if (!hud) throw new Error('No se encontró el contenedor #hud.');
 
   hud.innerHTML = `
-    <header class="barra" aria-label="Herramientas de edición">
-      <button class="accion" id="btn-catalogo" type="button" aria-expanded="false" aria-controls="cajon">☰ <span>Catálogo</span></button>
-      <span class="marca"><i class="punto" aria-hidden="true"></i><span>Planta Viva</span><span class="fase">Fase 1</span></span>
-      <span class="relleno"></span>
-      <button class="accion" id="btn-conexiones" type="button" aria-pressed="false">Conexiones</button>
-      <button class="accion accion-principal" id="btn-json" type="button">Exportar JSON</button>
+    <header class="barra" aria-label="Menú principal">
+      <button class="accion boton-menu" id="btn-catalogo" type="button" aria-expanded="false" aria-controls="cajon">
+        <span class="icono-menu" aria-hidden="true">☰</span><span>Menú</span>
+      </button>
+      <a class="marca" href="#" aria-label="Planta Viva, inicio" onclick="return false">
+        <span class="marca-icono" aria-hidden="true">PV</span><span class="marca-texto"><strong>Planta Viva</strong><small>Editor industrial 3D</small></span>
+      </a>
+      <nav class="menu-acciones" aria-label="Herramientas del proyecto">
+        <button class="accion" id="btn-conexiones" type="button" aria-pressed="false"><span aria-hidden="true">⌁</span> Conexiones</button>
+        <button class="accion accion-principal" id="btn-json" type="button"><span aria-hidden="true">⇧</span> Exportar</button>
+      </nav>
     </header>
-    <aside class="cajon" id="cajon" aria-label="Catálogo de equipos" aria-hidden="true" inert>
-      <div class="cajon-cab"><h2>Catálogo de equipos</h2><input id="buscador" class="buscador" type="search" placeholder="Buscar bomba, tanque…" aria-label="Buscar equipo"></div>
+    <div id="fondo-cajon" class="fondo-cajon" aria-hidden="true"></div>
+    <aside class="cajon" id="cajon" aria-label="Catálogo del proyecto" aria-hidden="true" inert>
+      <div class="cajon-cab">
+        <div class="cajon-titulo"><div><span class="sobretitulo">PROYECTO</span><h2>Catálogo</h2></div><button id="btn-cerrar-catalogo" class="accion cerrar-cajon" type="button" aria-label="Cerrar menú">×</button></div>
+        <p>Selecciona un equipo para agregarlo a la planta.</p>
+        <label class="buscador-contenedor"><span aria-hidden="true">⌕</span><input id="buscador" class="buscador" type="search" placeholder="Buscar equipo…" aria-label="Buscar equipo"></label>
+      </div>
       <div id="lista" class="cajon-lista"></div>
+      <footer class="cajon-pie"><span class="estado-punto"></span> Fase 2 · Diseño de planta</footer>
     </aside>
     <section id="propiedades" class="propiedades oculto" aria-live="polite" aria-label="Propiedades del equipo seleccionado"></section>
     <div id="avisos" class="avisos" aria-live="polite" aria-atomic="true"></div>
@@ -24,7 +35,18 @@ export function montarHud({ catalogo, alColocar, alExportar, alCambiarModo }) {
   const lista = hud.querySelector('#lista');
   const buscador = hud.querySelector('#buscador');
   const propiedades = hud.querySelector('#propiedades');
+  const botonMenu = hud.querySelector('#btn-catalogo');
+  const fondo = hud.querySelector('#fondo-cajon');
   const escapar = (valor) => String(valor ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+  function abrirCajon(abierto) {
+    drawer.classList.toggle('abierto', abierto);
+    drawer.setAttribute('aria-hidden', String(!abierto));
+    drawer.inert = !abierto;
+    fondo.classList.toggle('visible', abierto);
+    fondo.setAttribute('aria-hidden', String(!abierto));
+    botonMenu.setAttribute('aria-expanded', String(abierto));
+  }
 
   function avisar(texto, error = false) {
     const elemento = document.createElement('div');
@@ -56,15 +78,20 @@ export function montarHud({ catalogo, alColocar, alExportar, alCambiarModo }) {
       } else {
         const label = document.createElement('label'); label.htmlFor = id; label.textContent = campo.etiqueta;
         const select = document.createElement('select'); select.id = id;
-        for (const opcion of campo.opciones ?? []) { const option = document.createElement('option'); option.value = opcion; option.textContent = opcion; option.selected = opcion === campo.defecto; select.append(option); }
+        for (const opcion of campo.opciones ?? []) {
+          const option = document.createElement('option'); option.value = opcion; option.textContent = opcion; option.selected = opcion === campo.defecto; select.append(option);
+        }
         contenedor.append(label, select);
       }
       ficha.append(contenedor);
     }
-    const boton = document.createElement('button'); boton.className = 'colocar'; boton.type = 'button'; boton.textContent = 'Elegir y colocar';
+    const boton = document.createElement('button'); boton.className = 'colocar'; boton.type = 'button'; boton.textContent = 'Colocar en la planta';
     boton.addEventListener('click', () => {
       const params = {};
-      ficha.querySelectorAll('input, select').forEach((input) => { const clave = input.id.slice(`campo-${definicion.id}-`.length); params[clave] = input.type === 'range' ? Number(input.value) : input.value; });
+      ficha.querySelectorAll('input, select').forEach((input) => {
+        const clave = input.id.slice(`campo-${definicion.id}-`.length);
+        params[clave] = input.type === 'range' ? Number(input.value) : input.value;
+      });
       alColocar?.(definicion.id, params);
     });
     ficha.append(boton);
@@ -86,7 +113,7 @@ export function montarHud({ catalogo, alColocar, alExportar, alCambiarModo }) {
       const titulo = document.createElement('h3'); titulo.className = 'cat-titulo'; titulo.textContent = categoria; lista.append(titulo);
       for (const definicion of definiciones) {
         const fila = document.createElement('button'); fila.type = 'button'; fila.className = 'fila'; fila.setAttribute('aria-expanded', 'false');
-        fila.innerHTML = `<span class="nombre">${escapar(definicion.nombre)}</span><span class="cod">${escapar(definicion.codigo)}</span><span class="chev" aria-hidden="true">＋</span>`;
+        fila.innerHTML = `<span class="equipo-icono" aria-hidden="true">${definicion.familia === 'gabinete' ? '▤' : definicion.familia === 'bomba' ? '◉' : '⟷'}</span><span class="nombre">${escapar(definicion.nombre)}<small>${escapar(definicion.descripcion)}</small></span><span class="cod">${escapar(definicion.codigo)}</span><span class="chev" aria-hidden="true">＋</span>`;
         const ficha = crearFicha(definicion);
         fila.addEventListener('click', () => {
           const abierta = fila.getAttribute('aria-expanded') === 'true';
@@ -103,19 +130,19 @@ export function montarHud({ catalogo, alColocar, alExportar, alCambiarModo }) {
   function mostrarPropiedades(componente) {
     if (!componente) { propiedades.classList.add('oculto'); propiedades.replaceChildren(); return; }
     const definicion = catalogo.find((item) => item.id === componente.descriptorId);
-    propiedades.innerHTML = `<button class="accion cerrar" type="button" aria-label="Cerrar propiedades">×</button><h2>${escapar(componente.nombre ?? definicion?.nombre ?? componente.tipo)}</h2><span class="tag">${escapar(componente.tag)}</span><dl><dt>ID</dt><dd>${escapar(componente.id)}</dd><dt>Puertos</dt><dd>${componente.puertos?.length ?? 0}</dd></dl>`;
+    propiedades.innerHTML = `<button class="accion cerrar" type="button" aria-label="Cerrar propiedades">×</button><span class="sobretitulo">EQUIPO SELECCIONADO</span><h2>${escapar(componente.nombre ?? definicion?.nombre ?? componente.tipo)}</h2><span class="tag">${escapar(componente.tag)}</span><dl><dt>Familia</dt><dd>${escapar(componente.familia)}</dd><dt>Dimensiones</dt><dd>${escapar(componente.dimensiones.ancho)} × ${escapar(componente.dimensiones.alto)} × ${escapar(componente.dimensiones.profundidad)} m</dd><dt>Puertos</dt><dd>${componente.puertos.length}</dd></dl>`;
     propiedades.querySelector('.cerrar').addEventListener('click', () => mostrarPropiedades(null));
     propiedades.classList.remove('oculto');
   }
 
   buscador.addEventListener('input', () => pintarCatalogo(buscador.value));
-  pintarCatalogo();
-  hud.querySelector('#btn-catalogo').addEventListener('click', (evento) => {
-    const abierto = drawer.classList.toggle('abierto');
-    drawer.setAttribute('aria-hidden', String(!abierto)); drawer.inert = !abierto;
-    evento.currentTarget.setAttribute('aria-expanded', String(abierto));
-    if (abierto) buscador.focus();
+  botonMenu.addEventListener('click', () => {
+    const abierto = drawer.classList.contains('abierto');
+    abrirCajon(!abierto);
+    if (!abierto) buscador.focus();
   });
+  hud.querySelector('#btn-cerrar-catalogo').addEventListener('click', () => abrirCajon(false));
+  fondo.addEventListener('click', () => abrirCajon(false));
   hud.querySelector('#btn-json').addEventListener('click', () => alExportar?.());
   hud.querySelector('#btn-conexiones').addEventListener('click', (evento) => {
     const activo = evento.currentTarget.getAttribute('aria-pressed') !== 'true';
@@ -126,6 +153,6 @@ export function montarHud({ catalogo, alColocar, alExportar, alCambiarModo }) {
   return {
     aviso: avisar,
     mostrarPropiedades,
-    abrirCajon(abierto = true) { drawer.classList.toggle('abierto', abierto); drawer.setAttribute('aria-hidden', String(!abierto)); drawer.inert = !abierto; hud.querySelector('#btn-catalogo').setAttribute('aria-expanded', String(abierto)); }
+    abrirCajon
   };
 }
