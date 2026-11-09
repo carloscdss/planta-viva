@@ -14,14 +14,16 @@
 .boton-menu { display: none; }
 .fondo-cajon { position: absolute; inset: 72px 0 0; z-index: 1; visibility: hidden; background: rgba(3,8,11,.48); opacity: 0; transition: opacity .22s ease, visibility .22s ease; }
 .fondo-cajon.visible { visibility: visible; opacity: 1; }
-.cajon { position: absolute; z-index: 2; top: calc(72px + env(safe-area-inset-top)); bottom: 0; left: 0; display: flex; width: min(390px, 90vw); max-width: 100%; flex-direction: column; background: rgba(17,24,30,.97); border-right: 1px solid var(--line); box-shadow: 20px 0 60px rgba(0,0,0,.3); transform: translateX(-105%); transition: transform .24s cubic-bezier(.2,.8,.2,1); backdrop-filter: blur(18px); }
+
+/* Cajón para PC: fijo a la izquierda */
+.cajon { position: absolute; z-index: 2; top: calc(72px + env(safe-area-inset-top)); bottom: 0; left: 0; display: flex; width: min(390px, 90vw); max-width: 100%; flex-direction: column; background: rgba(17,24,30,.97); border-right: 1px solid var(--line); box-shadow: 20px 0 60px rgba(0,0,0,.3); transform: translateX(0); transition: transform .24s cubic-bezier(.2,.8,.2,1); backdrop-filter: blur(18px); }
 .cajon.abierto { transform: translateX(0); }
 .cajon-cab { padding: 22px 20px 16px; border-bottom: 1px solid var(--line); }
 .cajon-titulo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .cajon-titulo h2 { margin: 3px 0 0; font-size: 22px; letter-spacing: -.03em; }
 .cajon-cab p { margin: 10px 0 15px; color: var(--muted); font-size: 12px; }
 .sobretitulo { color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .16em; }
-.cerrar-cajon { min-width: 36px; min-height: 36px; padding: 0; font-size: 22px; }
+.cerrar-cajon { display: none; }
 .buscador-contenedor { display: flex; align-items: center; gap: 9px; padding: 0 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
 .buscador-contenedor > span { font-size: 22px; }
 .buscador { width: 100%; min-width: 0; padding: 11px 0; color: var(--text); background: transparent; border: 0; outline: 0; }
@@ -63,6 +65,14 @@
 #data-panel { display: none; position: absolute; z-index: 8; inset: calc(88px + env(safe-area-inset-top)) 18px calc(76px + env(safe-area-inset-bottom)); overflow: auto; padding: 18px; color: #b6f4ce; background: rgba(10,15,19,.96); border: 1px solid var(--line); border-radius: 14px; font: 11px/1.5 var(--mono); }
 #data-panel.open { display: block; }
 .oculto { display: none !important; }
+
+/* Responsive para celular y tablet */
+@media (max-width: 1024px) {
+  .cajon { transform: translateX(-105%); }
+  .cerrar-cajon { display: block; }
+  .boton-menu { display: inline-flex; min-width: 42px; padding-inline: 9px; }
+  .boton-menu .icono-menu { font-size: 16px; }
+}
 @media (max-width: 760px) {
   .barra { min-height: calc(64px + env(safe-area-inset-top)); gap: 12px; padding: calc(8px + env(safe-area-inset-top)) 14px 8px; }
   .fondo-cajon { inset-block-start: calc(64px + env(safe-area-inset-top)); }
@@ -75,8 +85,6 @@
   .marca-icono { width: 34px; height: 34px; border-radius: 10px; }
   .marca-texto strong { font-size: 12px; }
   .marca-texto small { display: none; }
-  .boton-menu { display: inline-flex; min-width: 42px; padding-inline: 9px; }
-  .boton-menu .icono-menu { font-size: 16px; }
   .menu-acciones { gap: 6px; }
   .menu-acciones .accion { min-width: 40px; min-height: 40px; gap: 4px; padding: 7px 9px; font-size: 10px; }
   .fondo-cajon { inset-block-start: calc(60px + env(safe-area-inset-top)); }
@@ -86,14 +94,4 @@
   .leyenda { top: calc(70px + env(safe-area-inset-top)); right: 10px; }
   #data-panel { inset: calc(72px + env(safe-area-inset-top)) 8px calc(55px + env(safe-area-inset-bottom)); padding: 10px; font-size: 10px; }
 }
-@media (max-width: 360px) {
-  .barra { gap: 5px; padding-inline: 7px; }
-  .boton-menu { width: 40px; min-width: 40px; overflow: hidden; gap: 0; font-size: 0; }
-  .boton-menu .icono-menu { font-size: 17px; }
-  .marca { gap: 6px; }
-  .marca-icono { width: 31px; height: 31px; }
-  .menu-acciones .accion { padding-inline: 7px; font-size: 9px; }
-}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
-
-
