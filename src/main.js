@@ -33,7 +33,6 @@ controles.dampingFactor = 0.08;
 controles.maxPolarAngle = Math.PI * 0.49;
 controles.minDistance = 3;
 controles.maxDistance = 35;
-
 configurarIluminacion(escena);
 crearRejilla(escena);
 
@@ -46,7 +45,7 @@ let fantasma = null;
 let familiaActiva = null;
 let paramsActivos = {};
 let posicionValida = false;
-let haySolape = false;
+let solapeActual = null;
 let seleccionado = null;
 let modoConexiones = false;
 let puertoPendiente = null;
@@ -73,7 +72,7 @@ function limpiarFantasma() {
   liberarGrupo(fantasma.grupo);
   fantasma = null;
   posicionValida = false;
-  haySolape = false;
+  solapeActual = null;
 }
 function crearFantasma() {
   limpiarFantasma();
@@ -89,13 +88,15 @@ function crearFantasma() {
   actualizarVisibilidadPuertos(modoConexiones);
 }
 function actualizarVisibilidadPuertos(visible) {
-  escena.traverse((objeto) => { if (objeto.userData?.puerto === true) objeto.visible = visible; });
+  escena.traverse((objeto) => {
+    if (objeto.userData?.puerto === true || objeto.userData?.esPuerto === true) objeto.visible = visible;
+  });
 }
 function actualizarColorFantasma() {
   if (!fantasma) return;
-  const color = haySolape ? 0x8a3b3b : 0xffffff;
+  const color = solapeActual ? 0x8a3b3b : 0xffffff;
   fantasma.grupo.traverse((objeto) => {
-    if (!objeto.isMesh || objeto.userData.puerto || !objeto.material) return;
+    if (!objeto.isMesh || objeto.userData?.puerto || objeto.userData?.esPuerto || !objeto.material) return;
     const materiales = Array.isArray(objeto.material) ? objeto.material : [objeto.material];
     for (const material of materiales) if (material.color) material.color.setHex(color);
   });
@@ -113,8 +114,9 @@ function actualizarFantasma(evento) {
   const posicion = ajustarAEquipos(grafo, base, dim);
   fantasma.grupo.position.copy(posicion);
   fantasma.grupo.visible = true;
-  haySolape = solapa(grafo, familiaActiva, paramsActivos, posicion, fantasma.grupo.rotation.y);
-  posicionValida = !haySolape;
+  // solapa devuelve el equipo en conflicto o null para una posición libre.
+  solapeActual = solapa(grafo, fantasma, posicion);
+  posicionValida = !solapeActual;
   actualizarColorFantasma();
 }
 function obtenerComponenteDesdeObjeto(objeto) {
@@ -125,9 +127,7 @@ function obtenerComponenteDesdeObjeto(objeto) {
 function seleccionarEn(evento) {
   ponerNDC(evento);
   const hits = rayo.intersectObjects(grafo.listar().map((componente) => componente.grupo), true);
-  const hit = modoConexiones
-    ? (hits.find((item) => item.object.userData?.puerto === true) ?? hits[0])
-    : hits[0];
+  const hit = modoConexiones ? (hits.find((item) => item.object.userData?.puerto || item.object.userData?.esPuerto) ?? hits[0]) : hits[0];
   const componente = hit ? obtenerComponenteDesdeObjeto(hit.object) : null;
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
@@ -137,11 +137,11 @@ function alternarModoConexiones(activo) {
   modoConexiones = activo;
   puertoPendiente = null;
   actualizarVisibilidadPuertos(activo);
-  aviso(activo ? 'Modo conexiones activo: selecciona dos puertos compatibles' : 'Modo conexiones desactivado');
+  aviso(activo ? 'Modo conexiones activo: selecciona puertos compatibles' : 'Modo conexiones desactivado');
 }
 function colocarComponente() {
   if (!fantasma || !fantasma.grupo.visible) { aviso('Mueve el puntero sobre el plano para elegir una posición', true); return; }
-  if (haySolape || !posicionValida) { aviso('No se puede colocar: la huella choca con otro equipo', true); return; }
+  if (!posicionValida) { aviso(`No se puede colocar: solapa con ${solapeActual?.tag ?? 'otro equipo'}`, true); return; }
   const componente = crearComponente(familiaActiva, { params: paramsActivos });
   componente.grupo.position.copy(fantasma.grupo.position);
   componente.grupo.quaternion.copy(fantasma.grupo.quaternion);
@@ -151,7 +151,7 @@ function colocarComponente() {
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
   actualizarPanelDatos();
-  aviso(`${componente.nombre ?? componente.descriptor?.nombre ?? componente.tipo} colocado`);
+  aviso(`${componente.nombre ?? componente.descriptor?.nombre ?? (familiaActiva === 'gabinete-base' ? 'Gabinete' : componente.tipo)} colocado`);
 }
 function procesarSeleccionDePuerto(componente, objeto) {
   const puerto = componente?.puertos.find((item) => item.id === objeto?.userData.portId);
@@ -225,7 +225,6 @@ window.addEventListener('keydown', (evento) => {
     actualizarColorFantasma();
   } else if (!focoEnControl && evento.key.toLowerCase() === 'd') panelDatos.classList.toggle('open');
 });
-
 function redimensionar() {
   const ancho = app.clientWidth;
   const alto = app.clientHeight;
@@ -234,7 +233,6 @@ function redimensionar() {
   renderer.setSize(ancho, alto);
 }
 window.addEventListener('resize', redimensionar);
-
 function animar() {
   requestAnimationFrame(animar);
   controles.update();

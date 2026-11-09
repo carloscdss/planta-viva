@@ -1,18 +1,6 @@
 #hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
 #hud > * { pointer-events: auto; }
-
-.barra {
-  position: absolute;
-  inset: 0 0 auto;
-  min-height: calc(56px + env(safe-area-inset-top));
-  display: flex;
-  align-items: center;
-  gap: clamp(5px, 1vw, 12px);
-  padding: env(safe-area-inset-top) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
-  background: rgba(14,17,20,.96);
-  border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(14px);
-}
+.barra { position: absolute; inset: 0 0 auto; min-height: calc(56px + env(safe-area-inset-top)); display: flex; align-items: center; gap: clamp(5px, 1vw, 12px); padding: env(safe-area-inset-top) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); background: rgba(14,17,20,.96); border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); }
 .marca { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .punto { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--accent); }
 .fase { color: var(--muted); font-weight: 400; }
@@ -68,7 +56,6 @@
   #data-panel { inset: calc(112px + env(safe-area-inset-top)) 8px calc(54px + env(safe-area-inset-bottom)); padding: 10px; font-size: 10px; }
 }
 @media (max-width: 360px) {
-  .barra { grid-template-columns: auto minmax(0, 1fr) auto; }
   .marca { letter-spacing: .02em; gap: 4px; }
   .fase { display: none; }
   .accion { padding-inline: 6px; font-size: 10px; }
