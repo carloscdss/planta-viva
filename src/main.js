@@ -41,7 +41,6 @@ const rayo = new THREE.Raycaster();
 const puntero = new THREE.Vector2();
 const plano = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const interseccion = new THREE.Vector3();
-const reloj = new THREE.Clock();
 let fantasma = null;
 let familiaActiva = null;
 let paramsActivos = {};
@@ -123,101 +122,12 @@ function componenteDe(objeto) {
   return actual ? grafo.obtener(actual.userData.componenteId) : null;
 }
 
-function mostrarPropiedades(componente) {
-  hud.mostrarPropiedades(componente);
-  if (!componente || !['bomba', 'valvula'].includes(componente.familia)) return;
-
-  const panel = document.getElementById('propiedades');
-  if (!panel) return;
-  const boton = document.createElement('button');
-  boton.className = 'colocar';
-  boton.type = 'button';
-  boton.textContent = componente.familia === 'bomba'
-    ? (componente.params.encendida ? 'Detener bomba' : 'Encender bomba')
-    : (componente.params.abierta ? 'Cerrar válvula' : 'Abrir válvula');
-  boton.addEventListener('click', () => {
-    if (componente.familia === 'bomba') componente.params.encendida = !componente.params.encendida;
-    else componente.params.abierta = !componente.params.abierta;
-    actualizarFlujos();
-    actualizarJSON();
-    mostrarPropiedades(componente);
-    aviso(componente.familia === 'bomba'
-      ? (componente.params.encendida ? 'Bomba encendida' : 'Bomba detenida')
-      : (componente.params.abierta ? 'Válvula abierta' : 'Válvula cerrada'));
-  });
-  panel.append(boton);
-}
-
-function actualizarFlujos() {
-  const conexiones = grafo.listarConexiones();
-  const conexionPorPuerto = new Map();
-  for (const conexion of conexiones) {
-    conexion.activo = false;
-    conexion.sentidoFlujo = 1;
-    conexionPorPuerto.set(`${conexion.componenteA.id}:${conexion.puertoA.id}`, conexion);
-    conexionPorPuerto.set(`${conexion.componenteB.id}:${conexion.puertoB.id}`, conexion);
-  }
-
-  const cola = [];
-  for (const componente of grafo.listar()) {
-    if (componente.familia !== 'bomba' || !componente.params.encendida) continue;
-    const descarga = componente.puertos.find((puerto) => puerto.id === 'descarga');
-    if (descarga) cola.push({ componente, entrada: null, salidaInicial: descarga });
-  }
-
-  const visitados = new Set();
-  while (cola.length) {
-    const { componente, entrada, salidaInicial } = cola.shift();
-    const claveEstado = `${componente.id}:${entrada?.id ?? `origen-${salidaInicial?.id ?? ''}`}`;
-    if (visitados.has(claveEstado)) continue;
-    visitados.add(claveEstado);
-
-    let salidas = [];
-    if (salidaInicial) {
-      salidas = [salidaInicial];
-    } else if (componente.familia === 'bomba') {
-      if (componente.params.encendida && entrada?.id === 'succion') {
-        const descarga = componente.puertos.find((puerto) => puerto.id === 'descarga');
-        if (descarga) salidas = [descarga];
-      }
-    } else if (componente.familia === 'valvula') {
-      if (componente.params.abierta) salidas = componente.puertos.filter((puerto) => puerto.tipo === 'proceso' && puerto !== entrada);
-    } else if (componente.familia === 'intercambiador') {
-      const pareja = {
-        'proceso-entrada': 'proceso-salida',
-        'proceso-salida': 'proceso-entrada',
-        'servicio-entrada': 'servicio-salida',
-        'servicio-salida': 'servicio-entrada'
-      }[entrada?.id];
-      const puertoPareja = pareja && componente.puertos.find((puerto) => puerto.id === pareja);
-      if (puertoPareja) salidas = [puertoPareja];
-    } else {
-      salidas = componente.puertos.filter((puerto) => puerto.tipo === 'proceso' && puerto !== entrada);
-    }
-
-    for (const salida of salidas) {
-      const conexion = conexionPorPuerto.get(`${componente.id}:${salida.id}`);
-      if (!conexion) continue;
-      const saleDesdeA = conexion.componenteA === componente && conexion.puertoA === salida;
-      conexion.activo = true;
-      conexion.sentidoFlujo = saleDesdeA ? 1 : -1;
-
-      const siguienteComponente = saleDesdeA ? conexion.componenteB : conexion.componenteA;
-      const siguientePuerto = saleDesdeA ? conexion.puertoB : conexion.puertoA;
-      if (siguientePuerto.tipo === 'proceso') {
-        cola.push({ componente: siguienteComponente, entrada: siguientePuerto });
-      }
-    }
-  }
-}
-
 function seleccionar(evento) {
   actualizarRayo(evento);
   const hits = rayo.intersectObjects(grafo.listar().map((c) => c.grupo), true);
   
   let hit = null;
   if (modoConexiones) {
-    // En modo conexiones, priorizar los puertos
     hit = hits.find((h) => h.object.userData?.puerto || h.object.userData?.esPuerto) || hits[0];
   } else {
     hit = hits[0];
@@ -225,7 +135,7 @@ function seleccionar(evento) {
   
   const componente = hit ? componenteDe(hit.object) : null;
   seleccionado = componente;
-  mostrarPropiedades(componente);
+  hud.mostrarPropiedades(componente);
   return { componente, objeto: hit?.object ?? null };
 }
 
@@ -249,9 +159,8 @@ function colocar() {
   actualizarVisibilidadPuertos(modoConexiones);
   
   seleccionado = componente;
-  mostrarPropiedades(componente);
+  hud.mostrarPropiedades(componente);
   actualizarJSON();
-  actualizarFlujos();
   aviso(`${componente.nombre ?? componente.tipo} colocado`);
 }
 
@@ -275,14 +184,9 @@ function conectarPuerto(componente, objeto) {
   }
   
   try {
-    // Crear la conexión lógica y visual
     const conexion = grafo.conectar(puertoPendiente.componente.id, puertoPendiente.puerto.id, componente.id, puerto.id);
-    
-    // Añadir el tubo a la escena 3D
     escena.add(conexion.malla);
-    
     puertoPendiente = null;
-    actualizarFlujos();
     actualizarJSON();
     aviso(`Conexión creada`);
   } catch (error) { 
@@ -328,7 +232,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (!inicioPuntero || inicioPuntero.id !== e.pointerId) return;
   const distancia = Math.hypot(e.clientX - inicioPuntero.x, e.clientY - inicioPuntero.y);
   inicioPuntero = null;
-  if (distancia > 7) return; // Fue un arrastre, no un clic
+  if (distancia > 7) return;
 
   if (familiaActiva) actualizarFantasma(e);
   
@@ -353,7 +257,7 @@ window.addEventListener('keydown', (e) => {
     hud.abrirCajon(false);
     panelDatos.classList.remove('open');
     seleccionado = null;
-    mostrarPropiedades(null);
+    hud.mostrarPropiedades(null);
   } else if (!controlEnfocado && e.key.toLowerCase() === 'r' && fantasma) {
     fantasma.grupo.rotation.y += Math.PI / 2;
     pintarFantasma();
@@ -371,7 +275,7 @@ function redimensionar() {
 }
 window.addEventListener('resize', redimensionar);
 
-// --- LÓGICA DE FLUJO (FASE 3) ---
+// --- FASE 3: LÓGICA Y ANIMACIÓN DE FLUJO ---
 window.alternarBombeo = () => {
   const conexiones = grafo.listarConexiones();
   if (conexiones.length === 0) {
@@ -383,11 +287,12 @@ window.alternarBombeo = () => {
   hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO: El agua está fluyendo' : 'Bombeo DETENIDO');
 };
 
-const reloj = new THREE.Clock(); // <-- AQUÍ SOLO DEBE HABER UNO
+const reloj = new THREE.Clock();
 function animar() { 
   requestAnimationFrame(animar); 
   const dt = reloj.getDelta();
   
+  // Animación del agua en las tuberías
   grafo.listarConexiones().forEach(c => c.animarFlujo(dt));
 
   controles.update(); 
