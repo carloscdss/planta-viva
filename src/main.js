@@ -371,11 +371,27 @@ function redimensionar() {
 }
 window.addEventListener('resize', redimensionar);
 
+// --- LÓGICA DE FLUJO (FASE 3) ---
+window.alternarBombeo = () => {
+  const conexiones = grafo.listarConexiones();
+  if (conexiones.length === 0) {
+    hud.aviso('No hay tuberías conectadas para bombear', true);
+    return;
+  }
+  const nuevoEstado = !conexiones[0].activo;
+  conexiones.forEach(c => c.activo = nuevoEstado);
+  hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO: El agua está fluyendo' : 'Bombeo DETENIDO');
+};
+
+const reloj = new THREE.Clock();
 function animar() { 
   requestAnimationFrame(animar); 
-  controles.update();
   const dt = reloj.getDelta();
-  for (const conexion of grafo.listarConexiones()) conexion.animarFlujo(dt);
+  
+  // Animación del agua en las tuberías
+  grafo.listarConexiones().forEach(c => c.animarFlujo(dt));
+
+  controles.update(); 
   renderer.render(escena, camara); 
 }
 
