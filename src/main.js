@@ -121,50 +121,84 @@ function componenteDe(objeto) {
   while (actual && !actual.userData.componenteId) actual = actual.parent;
   return actual ? grafo.obtener(actual.userData.componenteId) : null;
 }
+
 function seleccionar(evento) {
   actualizarRayo(evento);
   const hits = rayo.intersectObjects(grafo.listar().map((c) => c.grupo), true);
-  const hit = modoConexiones ? hits.find((h) => h.object.userData?.puerto || h.object.userData?.esPuerto) ?? hits[0] : hits[0];
+  
+  let hit = null;
+  if (modoConexiones) {
+    // En modo conexiones, priorizar los puertos
+    hit = hits.find((h) => h.object.userData?.puerto || h.object.userData?.esPuerto) || hits[0];
+  } else {
+    hit = hits[0];
+  }
+  
   const componente = hit ? componenteDe(hit.object) : null;
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
   return { componente, objeto: hit?.object ?? null };
 }
+
 function cambiarModoConexiones(activo) {
   modoConexiones = activo;
   puertoPendiente = null;
   actualizarVisibilidadPuertos(activo);
   aviso(activo ? 'Modo conexiones activo: selecciona puertos compatibles' : 'Modo conexiones desactivado');
 }
+
 function colocar() {
   if (!fantasma?.grupo.visible) { aviso('Mueve el puntero sobre el plano para elegir una posición', true); return; }
   if (!posicionValida) { aviso(`No se puede colocar: solapa con ${colision?.tag ?? 'otro equipo'}`, true); return; }
+  
   const componente = crearComponente(familiaActiva, { params: paramsActivos });
   componente.grupo.position.copy(fantasma.grupo.position);
   componente.grupo.quaternion.copy(fantasma.grupo.quaternion);
+  
   grafo.agregar(componente);
   escena.add(componente.grupo);
   actualizarVisibilidadPuertos(modoConexiones);
+  
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
   actualizarJSON();
-  const nombre = componente.nombre ?? componente.descriptor?.nombre ?? componente.tipo;
-  aviso(`${nombre} colocado`);
+  aviso(`${componente.nombre ?? componente.tipo} colocado`);
 }
+
 function conectarPuerto(componente, objeto) {
   const puerto = componente?.puertos.find((p) => p.id === objeto?.userData.portId);
   if (!puerto) { aviso('Selecciona un puerto visible', true); return; }
   if (puerto.conectadoA) { aviso('Ese puerto ya está conectado', true); return; }
-  if (!puertoPendiente) { puertoPendiente = { componente, puerto }; aviso(`Puerto ${puerto.tipo} seleccionado`); return; }
-  if (puertoPendiente.componente.id === componente.id) { puertoPendiente = { componente, puerto }; aviso('Selecciona un puerto de otro equipo', true); return; }
-  if (puertoPendiente.puerto.tipo !== puerto.tipo) { aviso('Los puertos no son compatibles', true); return; }
+  if (!puertoPendiente) { 
+    puertoPendiente = { componente, puerto }; 
+    aviso(`Puerto ${puerto.tipo} seleccionado, elige el segundo puerto`); 
+    return; 
+  }
+  if (puertoPendiente.componente.id === componente.id) { 
+    puertoPendiente = { componente, puerto }; 
+    aviso('Selecciona un puerto de otro equipo', true); 
+    return; 
+  }
+  if (puertoPendiente.puerto.tipo !== puerto.tipo) { 
+    aviso('Los puertos no son compatibles (ej. agua con electricidad)', true); 
+    return; 
+  }
+  
   try {
-    grafo.conectar(puertoPendiente.componente.id, puertoPendiente.puerto.id, componente.id, puerto.id);
+    // Crear la conexión lógica y visual
+    const conexion = grafo.conectar(puertoPendiente.componente.id, puertoPendiente.puerto.id, componente.id, puerto.id);
+    
+    // Añadir el tubo a la escena 3D
+    escena.add(conexion.malla);
+    
     puertoPendiente = null;
     actualizarJSON();
-    aviso(`Conexión ${puerto.tipo} creada`);
-  } catch (error) { aviso(error.message || 'No se pudo crear la conexión', true); }
+    aviso(`Conexión creada`);
+  } catch (error) { 
+    aviso(error.message || 'No se pudo crear la conexión', true); 
+  }
 }
+
 async function exportarJSON() {
   const json = JSON.stringify(grafo.aJSON(), null, 2);
   console.log('Planta Viva — grafo JSON:', json);
@@ -175,7 +209,6 @@ async function exportarJSON() {
     aviso('JSON del grafo copiado al portapapeles');
   } catch (error) {
     aviso('JSON impreso en consola; el navegador no permitió copiarlo', true);
-    console.warn('No se pudo copiar el JSON:', error);
   }
 }
 
@@ -192,22 +225,35 @@ hud = montarHud({
   alCambiarModo: cambiarModoConexiones
 });
 
-renderer.domElement.addEventListener('pointermove', (e) => { if (familiaActiva) actualizarFantasma(e); });
+renderer.domElement.addEventListener('pointermove', (e) => { 
+  if (familiaActiva) actualizarFantasma(e); 
+});
+
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.button === 0) inicioPuntero = { x: e.clientX, y: e.clientY, id: e.pointerId };
 });
+
 renderer.domElement.addEventListener('pointerup', (e) => {
   if (!inicioPuntero || inicioPuntero.id !== e.pointerId) return;
   const distancia = Math.hypot(e.clientX - inicioPuntero.x, e.clientY - inicioPuntero.y);
   inicioPuntero = null;
-  if (distancia > 7) return;
+  if (distancia > 7) return; // Fue un arrastre, no un clic
+
   if (familiaActiva) actualizarFantasma(e);
+  
   const resultado = seleccionar(e);
-  if (modoConexiones) { if (resultado.componente) conectarPuerto(resultado.componente, resultado.objeto); return; }
+  
+  if (modoConexiones) { 
+    if (resultado.componente) conectarPuerto(resultado.componente, resultado.objeto); 
+    return; 
+  }
+  
   if (!resultado.componente && familiaActiva) colocar();
 });
+
 renderer.domElement.addEventListener('pointercancel', () => { inicioPuntero = null; });
 renderer.domElement.addEventListener('pointerleave', () => { if (fantasma && !inicioPuntero) fantasma.grupo.visible = false; });
+
 window.addEventListener('keydown', (e) => {
   const controlEnfocado = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName);
   if (e.key === 'Escape') {
@@ -220,8 +266,11 @@ window.addEventListener('keydown', (e) => {
   } else if (!controlEnfocado && e.key.toLowerCase() === 'r' && fantasma) {
     fantasma.grupo.rotation.y += Math.PI / 2;
     pintarFantasma();
-  } else if (!controlEnfocado && e.key.toLowerCase() === 'd') panelDatos.classList.toggle('open');
+  } else if (!controlEnfocado && e.key.toLowerCase() === 'd') {
+    panelDatos.classList.toggle('open');
+  }
 });
+
 function redimensionar() {
   const ancho = app.clientWidth;
   const alto = app.clientHeight;
@@ -230,6 +279,12 @@ function redimensionar() {
   renderer.setSize(ancho, alto);
 }
 window.addEventListener('resize', redimensionar);
-function animar() { requestAnimationFrame(animar); controles.update(); renderer.render(escena, camara); }
+
+function animar() { 
+  requestAnimationFrame(animar); 
+  controles.update(); 
+  renderer.render(escena, camara); 
+}
+
 actualizarJSON();
 animar();
