@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#101820" />
-  <meta name="description" content="Editor y simulador de planta industrial 3D" />
-  <title>Planta Viva — Editor 3D</title>
+  <title>Planta Viva — Diagnóstico Fase 2</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./src/ui/tema.css" />
   <link rel="stylesheet" href="./src/ui/hud.css" />
@@ -17,12 +16,113 @@
       }
     }
   </script>
+  <style>
+    /* Panel de diagnóstico flotante */
+    #diag-panel {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.9); color: #fff; padding: 15px; border-radius: 8px;
+      font-family: monospace; font-size: 14px; z-index: 9999; border: 2px solid #2fb37a;
+      max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+    #diag-panel.error { border-color: #e05555; }
+    #diag-panel ul { margin: 10px 0 0; padding-left: 20px; }
+    #diag-panel li { margin-bottom: 5px; }
+    .ok-text { color: #2fb37a; font-weight: bold; }
+    .err-text { color: #e05555; font-weight: bold; }
+  </style>
 </head>
 <body>
   <main id="app" aria-label="Editor de planta industrial 3D">
     <div id="hud"></div>
     <pre id="data-panel" aria-label="Datos JSON de la planta"></pre>
   </main>
-  <script type="module" src="./src/main.js"></script>
+
+  <div id="diag-panel">
+    <div id="diag-title">⏳ Iniciando diagnóstico...</div>
+    <ul id="diag-list"></ul>
+  </div>
+
+  <script type="module">
+    // Este script captura errores globales antes de que main.js falle
+    window.addEventListener('error', (e) => {
+      const panel = document.getElementById('diag-panel');
+      const list = document.getElementById('diag-list');
+      panel.classList.add('error');
+      document.getElementById('diag-title').innerHTML = '❌ ERROR CRÍTICO DETECTADO';
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="err-text">[${e.filename.split('/').pop()}:${e.lineno}]</span> ${e.message}`;
+      list.appendChild(li);
+    });
+
+    // Iniciamos la carga de la app
+    import('./src/main.js')
+      .then(() => {
+        // Si main.js carga, verificamos si las variables globales de Fase 2 existen
+        setTimeout(() => {
+          const panel = document.getElementById('diag-panel');
+          const title = document.getElementById('diag-title');
+          const list = document.getElementById('diag-list');
+          
+          panel.classList.remove('error');
+          panel.classList.add('ok');
+          title.innerHTML = '✅ DIAGNÓSTICO: La aplicación cargó correctamente';
+
+          // Aquí verificamos si estás usando el código nuevo
+          const tieneConexion3D = document.querySelector('canvas') !== null;
+          
+          if (tieneConexion3D) {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="ok-text">[OK]</span> Three.js inicializado correctamente.`;
+            list.appendChild(li);
+          } else {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="err-text">[FALLO]</span> Three.js no se inicializó (Canvas no encontrado).`;
+            list.appendChild(li);
+          }
+
+          // Verificamos el texto del HUD (si dice Fase 1 o Fase 2)
+          const hudText = document.getElementById('hud')?.innerText || '';
+          if (hudText.includes('Fase 2')) {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="ok-text">[OK]</span> Archivo hud.js actualizado a Fase 2.`;
+            list.appendChild(li);
+          } else {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="err-text">[ALERTA]</span> El HUD aún muestra "Fase 1". GitHub no ha actualizado hud.js.`;
+            list.appendChild(li);
+          }
+
+          // Verificamos si las tuberías están en el catálogo
+          import('./src/catalogo/catalogo.js').then(mod => {
+             if (mod.catalogo && mod.catalogo.length >= 3) {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="ok-text">[OK]</span> Catálogo cargado con ${mod.catalogo.length} familias (incluye Tubería).`;
+                list.appendChild(li);
+             } else {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="err-text">[ALERTA]</span> El catálogo no tiene todos los elementos. Faltan archivos.`;
+                list.appendChild(li);
+             }
+          }).catch(err => {
+             const li = document.createElement('li');
+             li.innerHTML = `<span class="err-text">[ERROR]</span> No se pudo cargar catalogo.js: ${err.message}`;
+             list.appendChild(li);
+          });
+
+          // Ocultar el panel después de 10 segundos
+          setTimeout(() => { panel.style.display = 'none'; }, 12000);
+        }, 1000);
+      })
+      .catch((err) => {
+        const panel = document.getElementById('diag-panel');
+        const list = document.getElementById('diag-list');
+        panel.classList.add('error');
+        document.getElementById('diag-title').innerHTML = '❌ ERROR AL CARGAR main.js';
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="err-text">[FALLO]</span> ${err.message}. Es probable que falte un archivo de la Fase 2.`;
+        list.appendChild(li);
+        console.error(err);
+      });
+  </script>
 </body>
 </html>
