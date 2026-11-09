@@ -20,6 +20,7 @@ export class Grafo {
     const componente2 = this.obtener(componenteB);
     const a = componente1?.puertos.find((puerto) => puerto.id === puertoA);
     const b = componente2?.puertos.find((puerto) => puerto.id === puertoB);
+    
     if (!a || !b) throw new Error('No se encontraron ambos puertos en el grafo.');
     if (a.tipo !== b.tipo) throw new Error('Los puertos no son compatibles.');
     if (a.conectadoA || b.conectadoA) throw new Error('Uno de los puertos ya está conectado.');
@@ -31,11 +32,11 @@ export class Grafo {
       componenteB: componente2
     });
 
-    const id = `${componenteA}:${puertoA}--${componenteB}:${puertoB}`;
     a.conectadoA = { componenteId: componenteB, puertoId: puertoB };
     b.conectadoA = { componenteId: componenteA, puertoId: puertoA };
-    this.#conexiones.set(id, conexion);
-    return conexion;
+    this.#conexiones.set(conexion.id, conexion);
+    
+    return conexion; // Retornamos la conexión para que main.js la dibuje
   }
 
   aJSON() {
