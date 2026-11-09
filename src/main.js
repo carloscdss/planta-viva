@@ -39,13 +39,13 @@ crearRejilla(escena);
 const grafo = new Grafo();
 const rayo = new THREE.Raycaster();
 const puntero = new THREE.Vector2();
-const planoColocacion = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const puntoPlano = new THREE.Vector3();
+const plano = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const interseccion = new THREE.Vector3();
 let fantasma = null;
 let familiaActiva = null;
 let paramsActivos = {};
 let posicionValida = false;
-let solapeActual = null;
+let colision = null;
 let seleccionado = null;
 let modoConexiones = false;
 let puertoPendiente = null;
@@ -53,17 +53,17 @@ let inicioPuntero = null;
 let hud;
 
 function aviso(texto, error = false) { hud.aviso(texto, error); }
-function actualizarPanelDatos() { panelDatos.textContent = JSON.stringify(grafo.aJSON(), null, 2); }
-function ponerNDC(evento) {
+function actualizarJSON() { panelDatos.textContent = JSON.stringify(grafo.aJSON(), null, 2); }
+function actualizarRayo(evento) {
   const rect = renderer.domElement.getBoundingClientRect();
   puntero.set(((evento.clientX - rect.left) / rect.width) * 2 - 1, -((evento.clientY - rect.top) / rect.height) * 2 + 1);
   rayo.setFromCamera(puntero, camara);
 }
 function liberarGrupo(grupo) {
-  grupo.traverse((objeto) => {
-    objeto.geometry?.dispose();
-    if (Array.isArray(objeto.material)) objeto.material.forEach((material) => material.dispose());
-    else objeto.material?.dispose();
+  grupo.traverse((obj) => {
+    obj.geometry?.dispose();
+    if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+    else obj.material?.dispose();
   });
 }
 function limpiarFantasma() {
@@ -72,76 +72,74 @@ function limpiarFantasma() {
   liberarGrupo(fantasma.grupo);
   fantasma = null;
   posicionValida = false;
-  solapeActual = null;
+  colision = null;
 }
 function crearFantasma() {
   limpiarFantasma();
   if (!familiaActiva) return;
   fantasma = crearComponente(familiaActiva, { fantasma: true, params: paramsActivos });
-  fantasma.grupo.traverse((objeto) => {
-    if (!objeto.isMesh) return;
-    if (Array.isArray(objeto.material)) objeto.material = objeto.material.map((material) => material.clone());
-    else if (objeto.material) objeto.material = objeto.material.clone();
+  fantasma.grupo.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return;
+    obj.material = Array.isArray(obj.material) ? obj.material.map((m) => m.clone()) : obj.material.clone();
   });
   fantasma.grupo.visible = false;
   escena.add(fantasma.grupo);
   actualizarVisibilidadPuertos(modoConexiones);
 }
 function actualizarVisibilidadPuertos(visible) {
-  escena.traverse((objeto) => {
-    if (objeto.userData?.puerto === true || objeto.userData?.esPuerto === true) objeto.visible = visible;
+  escena.traverse((obj) => {
+    if (obj.userData?.puerto || obj.userData?.esPuerto) obj.visible = visible;
   });
 }
-function actualizarColorFantasma() {
+function pintarFantasma() {
   if (!fantasma) return;
-  const color = solapeActual ? 0x8a3b3b : 0xffffff;
-  fantasma.grupo.traverse((objeto) => {
-    if (!objeto.isMesh || objeto.userData?.puerto || objeto.userData?.esPuerto || !objeto.material) return;
-    const materiales = Array.isArray(objeto.material) ? objeto.material : [objeto.material];
-    for (const material of materiales) if (material.color) material.color.setHex(color);
+  const color = colision ? 0x8a3b3b : 0xffffff;
+  fantasma.grupo.traverse((obj) => {
+    if (!obj.isMesh || obj.userData?.puerto || obj.userData?.esPuerto || !obj.material) return;
+    for (const material of (Array.isArray(obj.material) ? obj.material : [obj.material])) material.color?.setHex(color);
   });
 }
 function actualizarFantasma(evento) {
   if (!fantasma || !familiaActiva) return;
-  ponerNDC(evento);
-  if (!rayo.ray.intersectPlane(planoColocacion, puntoPlano)) {
+  actualizarRayo(evento);
+  if (!rayo.ray.intersectPlane(plano, interseccion)) {
     posicionValida = false;
     fantasma.grupo.visible = false;
     return;
   }
   const dim = huella(fantasma);
-  const base = new THREE.Vector3(ajustarAGrilla(puntoPlano.x), fantasma.dimensiones.alto / 2, ajustarAGrilla(puntoPlano.z));
+  const base = new THREE.Vector3(ajustarAGrilla(interseccion.x), fantasma.dimensiones.alto / 2, ajustarAGrilla(interseccion.z));
   const posicion = ajustarAEquipos(grafo, base, dim);
   fantasma.grupo.position.copy(posicion);
   fantasma.grupo.visible = true;
-  // solapa devuelve el equipo en conflicto o null para una posición libre.
-  solapeActual = solapa(grafo, fantasma, posicion);
-  posicionValida = !solapeActual;
-  actualizarColorFantasma();
+  // solapa(grafo, candidato, posicion, idExcluido) devuelve el equipo en conflicto o null.
+  colision = solapa(grafo, fantasma, posicion);
+  posicionValida = !colision;
+  pintarFantasma();
 }
-function obtenerComponenteDesdeObjeto(objeto) {
+function componenteDe(objeto) {
   let actual = objeto;
   while (actual && !actual.userData.componenteId) actual = actual.parent;
   return actual ? grafo.obtener(actual.userData.componenteId) : null;
 }
-function seleccionarEn(evento) {
-  ponerNDC(evento);
-  const hits = rayo.intersectObjects(grafo.listar().map((componente) => componente.grupo), true);
-  const hit = modoConexiones ? (hits.find((item) => item.object.userData?.puerto || item.object.userData?.esPuerto) ?? hits[0]) : hits[0];
-  const componente = hit ? obtenerComponenteDesdeObjeto(hit.object) : null;
+function seleccionar(evento) {
+  actualizarRayo(evento);
+  const hits = rayo.intersectObjects(grafo.listar().map((c) => c.grupo), true);
+  const hit = modoConexiones ? hits.find((h) => h.object.userData?.puerto || h.object.userData?.esPuerto) ?? hits[0] : hits[0];
+  const componente = hit ? componenteDe(hit.object) : null;
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
   return { componente, objeto: hit?.object ?? null };
 }
-function alternarModoConexiones(activo) {
+function cambiarModoConexiones(activo) {
   modoConexiones = activo;
   puertoPendiente = null;
   actualizarVisibilidadPuertos(activo);
   aviso(activo ? 'Modo conexiones activo: selecciona puertos compatibles' : 'Modo conexiones desactivado');
 }
-function colocarComponente() {
-  if (!fantasma || !fantasma.grupo.visible) { aviso('Mueve el puntero sobre el plano para elegir una posición', true); return; }
-  if (!posicionValida) { aviso(`No se puede colocar: solapa con ${solapeActual?.tag ?? 'otro equipo'}`, true); return; }
+function colocar() {
+  if (!fantasma?.grupo.visible) { aviso('Mueve el puntero sobre el plano para elegir una posición', true); return; }
+  if (!posicionValida) { aviso(`No se puede colocar: solapa con ${colision?.tag ?? 'otro equipo'}`, true); return; }
   const componente = crearComponente(familiaActiva, { params: paramsActivos });
   componente.grupo.position.copy(fantasma.grupo.position);
   componente.grupo.quaternion.copy(fantasma.grupo.quaternion);
@@ -150,34 +148,35 @@ function colocarComponente() {
   actualizarVisibilidadPuertos(modoConexiones);
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
-  actualizarPanelDatos();
-  aviso(`${componente.nombre ?? componente.descriptor?.nombre ?? (familiaActiva === 'gabinete-base' ? 'Gabinete' : componente.tipo)} colocado`);
+  actualizarJSON();
+  const nombre = componente.nombre ?? componente.descriptor?.nombre ?? (familiaActiva === 'gabinete-base' ? 'Gabinete' : componente.tipo);
+  aviso(`${nombre} colocado`);
 }
-function procesarSeleccionDePuerto(componente, objeto) {
-  const puerto = componente?.puertos.find((item) => item.id === objeto?.userData.portId);
-  if (!puerto) { aviso('Selecciona un puerto visible para iniciar la conexión', true); return; }
+function conectarPuerto(componente, objeto) {
+  const puerto = componente?.puertos.find((p) => p.id === objeto?.userData.portId);
+  if (!puerto) { aviso('Selecciona un puerto visible', true); return; }
   if (puerto.conectadoA) { aviso('Ese puerto ya está conectado', true); return; }
-  if (!puertoPendiente) { puertoPendiente = { componente, puerto }; aviso(`Puerto ${puerto.tipo} de ${componente.tag} seleccionado`); return; }
-  if (puertoPendiente.componente.id === componente.id) { puertoPendiente = { componente, puerto }; aviso('Puerto inicial actualizado; selecciona otro equipo compatible'); return; }
-  if (puertoPendiente.puerto.tipo !== puerto.tipo) { aviso(`Puertos incompatibles: ${puertoPendiente.puerto.tipo} y ${puerto.tipo}`, true); return; }
+  if (!puertoPendiente) { puertoPendiente = { componente, puerto }; aviso(`Puerto ${puerto.tipo} seleccionado`); return; }
+  if (puertoPendiente.componente.id === componente.id) { puertoPendiente = { componente, puerto }; aviso('Selecciona un puerto de otro equipo', true); return; }
+  if (puertoPendiente.puerto.tipo !== puerto.tipo) { aviso('Los puertos no son compatibles', true); return; }
   try {
     grafo.conectar(puertoPendiente.componente.id, puertoPendiente.puerto.id, componente.id, puerto.id);
     puertoPendiente = null;
-    actualizarPanelDatos();
+    actualizarJSON();
     aviso(`Conexión ${puerto.tipo} creada`);
   } catch (error) { aviso(error.message || 'No se pudo crear la conexión', true); }
 }
 async function exportarJSON() {
   const json = JSON.stringify(grafo.aJSON(), null, 2);
   console.log('Planta Viva — grafo JSON:', json);
-  actualizarPanelDatos();
+  actualizarJSON();
   try {
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard API no disponible');
     await navigator.clipboard.writeText(json);
     aviso('JSON del grafo copiado al portapapeles');
   } catch (error) {
     aviso('JSON impreso en consola; el navegador no permitió copiarlo', true);
-    console.warn('No se pudo copiar el JSON al portapapeles:', error);
+    console.warn('No se pudo copiar el JSON:', error);
   }
 }
 
@@ -191,39 +190,38 @@ hud = montarHud({
     aviso('Vista previa activa: toca un espacio libre para colocar');
   },
   alExportar: exportarJSON,
-  alCambiarModo: alternarModoConexiones
+  alCambiarModo: cambiarModoConexiones
 });
 
-renderer.domElement.addEventListener('pointermove', (evento) => { if (familiaActiva) actualizarFantasma(evento); });
-renderer.domElement.addEventListener('pointerdown', (evento) => {
-  if (evento.button !== 0) return;
-  inicioPuntero = { x: evento.clientX, y: evento.clientY, id: evento.pointerId };
+renderer.domElement.addEventListener('pointermove', (e) => { if (familiaActiva) actualizarFantasma(e); });
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button === 0) inicioPuntero = { x: e.clientX, y: e.clientY, id: e.pointerId };
 });
-renderer.domElement.addEventListener('pointerup', (evento) => {
-  if (!inicioPuntero || inicioPuntero.id !== evento.pointerId) return;
-  const movimiento = Math.hypot(evento.clientX - inicioPuntero.x, evento.clientY - inicioPuntero.y);
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!inicioPuntero || inicioPuntero.id !== e.pointerId) return;
+  const distancia = Math.hypot(e.clientX - inicioPuntero.x, e.clientY - inicioPuntero.y);
   inicioPuntero = null;
-  if (movimiento > 7) return;
-  if (familiaActiva) actualizarFantasma(evento);
-  const seleccion = seleccionarEn(evento);
-  if (modoConexiones) { if (seleccion.componente) procesarSeleccionDePuerto(seleccion.componente, seleccion.objeto); return; }
-  if (!seleccion.componente && familiaActiva) colocarComponente();
+  if (distancia > 7) return;
+  if (familiaActiva) actualizarFantasma(e);
+  const resultado = seleccionar(e);
+  if (modoConexiones) { if (resultado.componente) conectarPuerto(resultado.componente, resultado.objeto); return; }
+  if (!resultado.componente && familiaActiva) colocar();
 });
 renderer.domElement.addEventListener('pointercancel', () => { inicioPuntero = null; });
 renderer.domElement.addEventListener('pointerleave', () => { if (fantasma && !inicioPuntero) fantasma.grupo.visible = false; });
-window.addEventListener('keydown', (evento) => {
-  const focoEnControl = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName);
-  if (evento.key === 'Escape') {
+window.addEventListener('keydown', (e) => {
+  const controlEnfocado = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName);
+  if (e.key === 'Escape') {
     if (familiaActiva) { familiaActiva = null; paramsActivos = {}; limpiarFantasma(); aviso('Colocación cancelada'); }
-    if (modoConexiones) puertoPendiente = null;
+    puertoPendiente = null;
     hud.abrirCajon(false);
     panelDatos.classList.remove('open');
     seleccionado = null;
     hud.mostrarPropiedades(null);
-  } else if (!focoEnControl && evento.key.toLowerCase() === 'r' && fantasma) {
+  } else if (!controlEnfocado && e.key.toLowerCase() === 'r' && fantasma) {
     fantasma.grupo.rotation.y += Math.PI / 2;
-    actualizarColorFantasma();
-  } else if (!focoEnControl && evento.key.toLowerCase() === 'd') panelDatos.classList.toggle('open');
+    pintarFantasma();
+  } else if (!controlEnfocado && e.key.toLowerCase() === 'd') panelDatos.classList.toggle('open');
 });
 function redimensionar() {
   const ancho = app.clientWidth;
@@ -233,10 +231,6 @@ function redimensionar() {
   renderer.setSize(ancho, alto);
 }
 window.addEventListener('resize', redimensionar);
-function animar() {
-  requestAnimationFrame(animar);
-  controles.update();
-  renderer.render(escena, camara);
-}
-actualizarPanelDatos();
+function animar() { requestAnimationFrame(animar); controles.update(); renderer.render(escena, camara); }
+actualizarJSON();
 animar();
