@@ -287,10 +287,10 @@ window.alternarBombeo = () => {
   hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO: El agua está fluyendo' : 'Bombeo DETENIDO');
 };
 
-const reloj = new THREE.Clock();
+const relojAnimacion = new THREE.Clock();
 function animar() { 
   requestAnimationFrame(animar); 
-  const dt = reloj.getDelta();
+  const dt = relojAnimacion.getDelta();
   
   // Animación del agua en las tuberías
   grafo.listarConexiones().forEach(c => c.animarFlujo(dt));
