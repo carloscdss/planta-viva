@@ -55,13 +55,11 @@ let hud;
 
 function aviso(texto, error = false) { hud.aviso(texto, error); }
 function actualizarPanelDatos() { panelDatos.textContent = JSON.stringify(grafo.aJSON(), null, 2); }
-
 function ponerNDC(evento) {
   const rect = renderer.domElement.getBoundingClientRect();
   puntero.set(((evento.clientX - rect.left) / rect.width) * 2 - 1, -((evento.clientY - rect.top) / rect.height) * 2 + 1);
   rayo.setFromCamera(puntero, camara);
 }
-
 function liberarGrupo(grupo) {
   grupo.traverse((objeto) => {
     objeto.geometry?.dispose();
@@ -69,7 +67,6 @@ function liberarGrupo(grupo) {
     else objeto.material?.dispose();
   });
 }
-
 function limpiarFantasma() {
   if (!fantasma) return;
   escena.remove(fantasma.grupo);
@@ -78,7 +75,6 @@ function limpiarFantasma() {
   posicionValida = false;
   haySolape = false;
 }
-
 function crearFantasma() {
   limpiarFantasma();
   if (!familiaActiva) return;
@@ -92,13 +88,9 @@ function crearFantasma() {
   escena.add(fantasma.grupo);
   actualizarVisibilidadPuertos(modoConexiones);
 }
-
 function actualizarVisibilidadPuertos(visible) {
-  escena.traverse((objeto) => {
-    if (objeto.userData?.puerto === true) objeto.visible = visible;
-  });
+  escena.traverse((objeto) => { if (objeto.userData?.puerto === true) objeto.visible = visible; });
 }
-
 function actualizarColorFantasma() {
   if (!fantasma) return;
   const color = haySolape ? 0x8a3b3b : 0xffffff;
@@ -108,7 +100,6 @@ function actualizarColorFantasma() {
     for (const material of materiales) if (material.color) material.color.setHex(color);
   });
 }
-
 function actualizarFantasma(evento) {
   if (!fantasma || !familiaActiva) return;
   ponerNDC(evento);
@@ -126,30 +117,28 @@ function actualizarFantasma(evento) {
   posicionValida = !haySolape;
   actualizarColorFantasma();
 }
-
 function obtenerComponenteDesdeObjeto(objeto) {
   let actual = objeto;
   while (actual && !actual.userData.componenteId) actual = actual.parent;
   return actual ? grafo.obtener(actual.userData.componenteId) : null;
 }
-
 function seleccionarEn(evento) {
   ponerNDC(evento);
   const hits = rayo.intersectObjects(grafo.listar().map((componente) => componente.grupo), true);
-  const hit = hits.find((item) => obtenerComponenteDesdeObjeto(item.object));
+  const hit = modoConexiones
+    ? (hits.find((item) => item.object.userData?.puerto === true) ?? hits[0])
+    : hits[0];
   const componente = hit ? obtenerComponenteDesdeObjeto(hit.object) : null;
   seleccionado = componente;
   hud.mostrarPropiedades(componente);
   return { componente, objeto: hit?.object ?? null };
 }
-
 function alternarModoConexiones(activo) {
   modoConexiones = activo;
   puertoPendiente = null;
   actualizarVisibilidadPuertos(activo);
-  aviso(activo ? 'Modo conexiones activo' : 'Modo conexiones desactivado');
+  aviso(activo ? 'Modo conexiones activo: selecciona dos puertos compatibles' : 'Modo conexiones desactivado');
 }
-
 function colocarComponente() {
   if (!fantasma || !fantasma.grupo.visible) { aviso('Mueve el puntero sobre el plano para elegir una posición', true); return; }
   if (haySolape || !posicionValida) { aviso('No se puede colocar: la huella choca con otro equipo', true); return; }
@@ -164,7 +153,6 @@ function colocarComponente() {
   actualizarPanelDatos();
   aviso(`${componente.nombre ?? componente.descriptor?.nombre ?? componente.tipo} colocado`);
 }
-
 function procesarSeleccionDePuerto(componente, objeto) {
   const puerto = componente?.puertos.find((item) => item.id === objeto?.userData.portId);
   if (!puerto) { aviso('Selecciona un puerto visible para iniciar la conexión', true); return; }
@@ -179,7 +167,6 @@ function procesarSeleccionDePuerto(componente, objeto) {
     aviso(`Conexión ${puerto.tipo} creada`);
   } catch (error) { aviso(error.message || 'No se pudo crear la conexión', true); }
 }
-
 async function exportarJSON() {
   const json = JSON.stringify(grafo.aJSON(), null, 2);
   console.log('Planta Viva — grafo JSON:', json);
@@ -238,6 +225,7 @@ window.addEventListener('keydown', (evento) => {
     actualizarColorFantasma();
   } else if (!focoEnControl && evento.key.toLowerCase() === 'd') panelDatos.classList.toggle('open');
 });
+
 function redimensionar() {
   const ancho = app.clientWidth;
   const alto = app.clientHeight;
@@ -246,6 +234,7 @@ function redimensionar() {
   renderer.setSize(ancho, alto);
 }
 window.addEventListener('resize', redimensionar);
+
 function animar() {
   requestAnimationFrame(animar);
   controles.update();
