@@ -7,6 +7,7 @@ import { catalogo, crearComponente } from './catalogo/catalogo.js';
 import { Grafo } from './modelo/grafo.js';
 import { ajustarAGrilla, ajustarAEquipos, huella, solapa } from './edicion/colocacion.js';
 import { montarHud } from './ui/hud.js';
+import { analizarMaqueta } from './supervisor.js'; // <-- Importamos el Supervisor
 
 const app = document.querySelector('#app');
 const panelDatos = document.querySelector('#data-panel');
@@ -143,7 +144,7 @@ function cambiarModoConexiones(activo) {
   modoConexiones = activo;
   puertoPendiente = null;
   actualizarVisibilidadPuertos(activo);
-  aviso(activo ? 'Modo conexiones activo: selecciona puertos compatibles' : 'Modo conexiones desactivado');
+  aviso(activo ? 'Modo conexiones activo: toca un equipo para autoconectar' : 'Modo conexiones desactivado');
 }
 
 function colocar() {
@@ -164,56 +165,13 @@ function colocar() {
   aviso(`${componente.nombre ?? componente.tipo} colocado`);
 }
 
-// Lógica de Conexión Manual Mejorada
-function conectarPuerto(componente, objeto) {
-  const puerto = componente?.puertos.find((p) => p.id === objeto?.userData.portId);
-  if (!puerto) { aviso('Selecciona un puerto visible', true); return; }
-  if (puerto.conectadoA) { aviso('Ese puerto ya está conectado', true); return; }
-  
-  // Si es el primer clic, guardamos el puerto pendiente
-  if (!puertoPendiente) { 
-    puertoPendiente = { componente, puerto }; 
-    aviso(`Puerto ${puerto.tipo} seleccionado, elige el segundo puerto`); 
-    
-    // Resaltar puertos compatibles cercanos (opcional visual)
-    escena.traverse((obj) => {
-      if (obj.userData?.esPuerto && obj !== objeto) {
-        // Si es del mismo tipo, brillar
-      }
-    });
-    return; 
-  }
-  
-  if (puertoPendiente.componente.id === componente.id) { 
-    puertoPendiente = { componente, puerto }; 
-    aviso('Selecciona un puerto de otro equipo', true); 
-    return; 
-  }
-  if (puertoPendiente.puerto.tipo !== puerto.tipo) { 
-    aviso('Los puertos no son compatibles (ej. agua con electricidad)', true); 
-    return; 
-  }
-  
-  try {
-    const conexion = grafo.conectar(puertoPendiente.componente.id, puertoPendiente.puerto.id, componente.id, puerto.id);
-    escena.add(conexion.malla);
-    puertoPendiente = null;
-    actualizarJSON();
-    aviso(`Conexión creada`);
-  } catch (error) { 
-    aviso(error.message || 'No se pudo crear la conexión', true); 
-  }
-}
-
-// Nueva Lógica: Auto-Conectar al hacer clic en el piso o equipo cercano
+// Función de Auto-Conexión
 function autoConectarDesdeEquipo(componente) {
-  // Buscar el puerto libre más cercano
   const puertosLibres = [];
   grafo.listar().forEach(c => {
-    if (c.id === componente.id) return; // No conectar consigo mismo
+    if (c.id === componente.id) return;
     c.puertos.forEach(p => {
       if (!p.conectadoA && p.tipo === 'proceso') {
-        // Calcular distancia global
         const posMundo = new THREE.Vector3().copy(p.posicion);
         c.grupo.localToWorld(posMundo);
         const dist = componente.grupo.position.distanceTo(posMundo);
@@ -222,7 +180,6 @@ function autoConectarDesdeEquipo(componente) {
     });
   });
 
-  // Ordenar por cercanía
   puertosLibres.sort((a, b) => a.distancia - b.distancia);
 
   if (puertosLibres.length === 0) {
@@ -230,29 +187,33 @@ function autoConectarDesdeEquipo(componente) {
     return;
   }
 
-  // Tomar el más cercano
   const mejor = puertosLibres[0];
-  
+  const miPuertoLibre = componente.puertos.find(p => !p.conectadoA && p.tipo === 'proceso');
+
+  if (!miPuertoLibre) {
+    aviso('Este equipo no tiene puertos libres.', true);
+    return;
+  }
+
   try {
-    const conexion = grafo.conectar(componente.id, componente.puertos.find(p=>!p.conectadoA && p.tipo==='proceso').id, mejor.componente.id, mejor.puerto.id);
+    const conexion = grafo.conectar(componente.id, miPuertoLibre.id, mejor.componente.id, mejor.puerto.id);
     escena.add(conexion.malla);
     actualizarJSON();
     aviso(`Auto-conectado a ${mejor.componente.nombre}`);
   } catch (error) {
-    aviso('No se pudo autoconectar', true);
+    aviso('No se pudo autoconectar: ' + error.message, true);
   }
 }
 
 async function exportarJSON() {
   const json = JSON.stringify(grafo.aJSON(), null, 2);
-  console.log('Planta Viva — grafo JSON:', json);
   actualizarJSON();
   try {
-    if (!navigator.clipboard?.writeText) throw new Error('Clipboard API no disponible');
     await navigator.clipboard.writeText(json);
-    aviso('JSON del grafo copiado al portapapeles');
+    aviso('JSON copiado al portapapeles');
   } catch (error) {
-    aviso('JSON impreso en consola; el navegador no permitió copiarlo', true);
+    console.log('JSON:', json);
+    aviso('JSON impreso en consola', true);
   }
 }
 
@@ -269,13 +230,17 @@ hud = montarHud({
   alCambiarModo: cambiarModoConexiones
 });
 
-renderer.domElement.addEventListener('pointermove', (e) => { 
-  if (familiaActiva) actualizarFantasma(e); 
+// Conectar botón del Supervisor IA
+document.getElementById('btn-supervisor').addEventListener('click', async () => {
+  hud.aviso('El supervisor IA está analizando la maqueta. Por favor espera...');
+  const analisis = await analizarMaqueta(escena, grafo);
+  panelDatos.textContent = "ANÁLISIS DEL SUPERVISOR IA:\n\n" + analisis;
+  panelDatos.classList.add('open');
+  hud.aviso('Análisis completado. Revisa el panel.');
 });
 
-renderer.domElement.addEventListener('pointerdown', (e) => {
-  if (e.button === 0) inicioPuntero = { x: e.clientX, y: e.clientY, id: e.pointerId };
-});
+renderer.domElement.addEventListener('pointermove', (e) => { if (familiaActiva) actualizarFantasma(e); });
+renderer.domElement.addEventListener('pointerdown', (e) => { if (e.button === 0) inicioPuntero = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
 
 renderer.domElement.addEventListener('pointerup', (e) => {
   if (!inicioPuntero || inicioPuntero.id !== e.pointerId) return;
@@ -284,38 +249,23 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (distancia > 7) return;
 
   if (familiaActiva) actualizarFantasma(e);
-  
   const resultado = seleccionar(e);
   
-  // Si estamos en modo conexiones
-  if (modoConexiones) { 
-    // Si tocamos un puerto específico
-    if (resultado.componente && resultado.objeto?.userData?.esPuerto) { 
-      conectarPuerto(resultado.componente, resultado.objeto); 
-      return;
-    }
-    // Si tocamos el cuerpo de un equipo, autoconectar al puerto más cercano
-    if (resultado.componente) {
-      autoConectarDesdeEquipo(resultado.componente);
-      return;
-    }
+  if (modoConexiones && resultado.componente) { 
+    autoConectarDesdeEquipo(resultado.componente);
+    return;
   }
   
   if (!resultado.componente && familiaActiva) colocar();
 });
 
-renderer.domElement.addEventListener('pointercancel', () => { inicioPuntero = null; });
-renderer.domElement.addEventListener('pointerleave', () => { if (fantasma && !inicioPuntero) fantasma.grupo.visible = false; });
-
 window.addEventListener('keydown', (e) => {
   const controlEnfocado = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName);
   if (e.key === 'Escape') {
-    if (familiaActiva) { familiaActiva = null; paramsActivos = {}; limpiarFantasma(); aviso('Colocación cancelada'); }
+    if (familiaActiva) { familiaActiva = null; paramsActivos = {}; limpiarFantasma(); aviso('Cancelado'); }
     puertoPendiente = null;
     hud.abrirCajon(false);
     panelDatos.classList.remove('open');
-    seleccionado = null;
-    hud.mostrarPropiedades(null);
   } else if (!controlEnfocado && e.key.toLowerCase() === 'r' && fantasma) {
     fantasma.grupo.rotation.y += Math.PI / 2;
     pintarFantasma();
@@ -325,24 +275,18 @@ window.addEventListener('keydown', (e) => {
 });
 
 function redimensionar() {
-  const ancho = app.clientWidth;
-  const alto = app.clientHeight;
-  camara.aspect = ancho / alto;
+  camara.aspect = app.clientWidth / app.clientHeight;
   camara.updateProjectionMatrix();
-  renderer.setSize(ancho, alto);
+  renderer.setSize(app.clientWidth, app.clientHeight);
 }
 window.addEventListener('resize', redimensionar);
 
-// --- LÓGICA DE FLUJO (FASE 3) ---
 window.alternarBombeo = () => {
   const conexiones = grafo.listarConexiones();
-  if (conexiones.length === 0) {
-    hud.aviso('No hay tuberías conectadas para bombear', true);
-    return false;
-  }
+  if (conexiones.length === 0) { hud.aviso('No hay tuberías', true); return false; }
   const nuevoEstado = !conexiones[0].activo;
   conexiones.forEach(c => c.activo = nuevoEstado);
-  hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO: El agua está fluyendo' : 'Bombeo DETENIDO');
+  hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO' : 'Bombeo DETENIDO');
   return nuevoEstado;
 };
 
