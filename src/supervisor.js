@@ -1,5 +1,5 @@
 // src/supervisor.js
-const GEMINI_API_KEY = "PEGA_TU_API_KEY_AQUI"; // <-- ¿Ya pusiste tu clave aquí?
+const GEMINI_API_KEY = "AQ.Ab8RN6IhruFQfO8FtJV2YeC4qlZ6jw612aUdog2T4L1eNIoSQg"; // <-- ¿Ya pusiste tu clave aquí?
 
 export async function analizarMaqueta(escena, grafo) {
   if (GEMINI_API_KEY === "AQ.Ab8RN6IhruFQfO8FtJV2YeC4qlZ6jw612aUdog2T4L1eNIoSQg") {
