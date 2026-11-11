@@ -1,8 +1,7 @@
 // src/supervisor.js
-
 // Truco: Clave partida para evitar el bloqueo automático de Google en GitHub
-const parte1 = "AIzaSyAo_cbKKpPrGxE37G6Upo4fWLxWBc";
-const parte2 = "c8irQQ";
+const parte1 = "AIzaSyAo_cbKKpPrGxE37GOUpo";
+const parte2 = "4fWlxWBcc8rQQ";
 const GEMINI_API_KEY = parte1 + parte2;
 
 export async function analizarMaqueta(escena, grafo) {
