@@ -5,19 +5,20 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   hud.innerHTML = `
     <header class="barra" aria-label="Menú principal">
       <button class="accion boton-menu" id="btn-catalogo" type="button" aria-expanded="false" aria-controls="cajon">
-        <span class="icono-menu" aria-hidden="true">☰</span><span>Menú</span>
+        <span class="icono-menu" aria-hidden="true">☰</span>
       </button>
       <a class="marca" href="#" aria-label="Planta Viva, inicio" onclick="return false">
         <span class="marca-icono" aria-hidden="true">PV</span><span class="marca-texto"><strong>Planta Viva</strong><small>Editor industrial 3D</small></span>
       </a>
       <nav class="menu-acciones" aria-label="Herramientas del proyecto">
+        <button class="accion" id="btn-supervisor" type="button" style="background: #f59e0b; border-color: #d97706; color: white;">🧠 Supervisor IA</button>
         <button class="accion" id="btn-conexiones" type="button" aria-pressed="false"><span aria-hidden="true">⌁</span> Conexiones</button>
-        <button class="accion" id="btn-bombear" type="button" style="background: #3b82f6; color: white; border-color: #2563eb;">💧 Bombear</button>
+        <button class="accion" id="btn-bombear" type="button" aria-pressed="false"><span aria-hidden="true">💧</span> Bombear</button>
         <button class="accion accion-principal" id="btn-json" type="button"><span aria-hidden="true">⇧</span> Exportar</button>
       </nav>
     </header>
     <div id="fondo-cajon" class="fondo-cajon" aria-hidden="true"></div>
-    <aside class="cajon" id="cajon" aria-label="Catálogo del proyecto" aria-hidden="true" inert>
+    <aside class="cajon" id="cajon" aria-label="Catálogo del proyecto" aria-hidden="true">
       <div class="cajon-cab">
         <div class="cajon-titulo"><div><span class="sobretitulo">PROYECTO</span><h2>Catálogo</h2></div><button id="btn-cerrar-catalogo" class="accion cerrar-cajon" type="button" aria-label="Cerrar menú">×</button></div>
         <p>Selecciona un equipo para agregarlo a la planta.</p>
@@ -43,7 +44,6 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   function abrirCajon(abierto) {
     drawer.classList.toggle('abierto', abierto);
     drawer.setAttribute('aria-hidden', String(!abierto));
-    drawer.inert = !abierto;
     fondo.classList.toggle('visible', abierto);
     fondo.setAttribute('aria-hidden', String(!abierto));
     botonMenu.setAttribute('aria-expanded', String(abierto));
@@ -136,7 +136,9 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
     propiedades.classList.remove('oculto');
   }
 
-  buscador.addEventListener('input', () => pintarCatalogo(buscador.value));
+  // Eventos de la interfaz
+  buscador.addEventListener('input', (e) => pintarCatalogo(e.target.value));
+  
   botonMenu.addEventListener('click', () => {
     const abierto = drawer.classList.contains('abierto');
     abrirCajon(!abierto);
@@ -145,17 +147,23 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   hud.querySelector('#btn-cerrar-catalogo').addEventListener('click', () => abrirCajon(false));
   fondo.addEventListener('click', () => abrirCajon(false));
   hud.querySelector('#btn-json').addEventListener('click', () => alExportar?.());
+  
   hud.querySelector('#btn-conexiones').addEventListener('click', (evento) => {
     const activo = evento.currentTarget.getAttribute('aria-pressed') !== 'true';
     evento.currentTarget.setAttribute('aria-pressed', String(activo));
     hud.querySelector('#leyenda').classList.toggle('oculto', !activo);
     alCambiarModo?.(activo);
   });
-  
-  // Botón de Bombeo
-  hud.querySelector('#btn-bombear').addEventListener('click', () => {
-    if (window.alternarBombeo) window.alternarBombeo();
+
+  hud.querySelector('#btn-bombear').addEventListener('click', (evento) => {
+    const btn = evento.currentTarget;
+    if (window.alternarBombeo) {
+      const estado = window.alternarBombeo();
+      btn.setAttribute('aria-pressed', String(estado));
+    }
   });
+
+  pintarCatalogo();
 
   return {
     aviso: avisar,
