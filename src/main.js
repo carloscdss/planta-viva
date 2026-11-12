@@ -7,8 +7,8 @@ import { catalogo, crearComponente } from './catalogo/catalogo.js';
 import { Grafo } from './modelo/grafo.js';
 import { ajustarAGrilla, ajustarAEquipos, huella, solapa } from './edicion/colocacion.js';
 import { montarHud } from './ui/hud.js';
-import { analizarMaqueta } from './supervisor.js'; // <-- Se mantiene por ahora, pero cambiaremos su lógica luego
-import { registrar } from './nucleo/registro.js'; // <-- NUEVO: Para el supervisor local
+import { analizarMaqueta } from './supervisor.js';
+import { registrar } from './nucleo/registro.js';
 
 const app = document.querySelector('#app');
 const panelDatos = document.querySelector('#data-panel');
@@ -40,12 +40,10 @@ crearRejilla(escena);
 
 const grafo = new Grafo();
 
-// --- PASO 0: REGISTRO GLOBAL PARA EL SUPERVISOR ---
 registrar('escena', escena);
 registrar('renderer', renderer);
 registrar('camara', camara);
 registrar('grafo', grafo);
-// --------------------------------------------------
 
 const rayo = new THREE.Raycaster();
 const puntero = new THREE.Vector2();
@@ -174,7 +172,7 @@ function colocar() {
   aviso(`${componente.nombre ?? componente.tipo} colocado`);
 }
 
-// Función de Auto-Conexión
+// Función de Auto-Conexión (corregida para solo conectar equipos cercanos)
 function autoConectarDesdeEquipo(componente) {
   const puertosLibres = [];
   grafo.listar().forEach(c => {
@@ -184,7 +182,10 @@ function autoConectarDesdeEquipo(componente) {
         const posMundo = new THREE.Vector3().copy(p.posicion);
         c.grupo.localToWorld(posMundo);
         const dist = componente.grupo.position.distanceTo(posMundo);
-        puertosLibres.push({ componente: c, puerto: p, distancia: dist });
+        // Solo consideramos equipos a menos de 4 metros
+        if (dist < 4) {
+          puertosLibres.push({ componente: c, puerto: p, distancia: dist });
+        }
       }
     });
   });
@@ -192,7 +193,7 @@ function autoConectarDesdeEquipo(componente) {
   puertosLibres.sort((a, b) => a.distancia - b.distancia);
 
   if (puertosLibres.length === 0) {
-    aviso('No hay otros equipos con puertos libres.', true);
+    aviso('No hay equipos cercanos con puertos libres (distancia max 4m).', true);
     return;
   }
 
@@ -208,7 +209,7 @@ function autoConectarDesdeEquipo(componente) {
     const conexion = grafo.conectar(componente.id, miPuertoLibre.id, mejor.componente.id, mejor.puerto.id);
     escena.add(conexion.malla);
     actualizarJSON();
-    aviso(`Auto-conectado a ${mejor.componente.nombre}`);
+    aviso(`Auto-conectado a ${mejor.componente.nombre} (a ${mejor.distancia.toFixed(1)}m)`);
   } catch (error) {
     aviso('No se pudo autoconectar: ' + error.message, true);
   }
@@ -226,6 +227,25 @@ async function exportarJSON() {
   }
 }
 
+// Exponer funciones globales para el HUD
+window.alternarBombeo = () => {
+  const conexiones = grafo.listarConexiones();
+  if (conexiones.length === 0) { hud.aviso('No hay tuberías', true); return false; }
+  const nuevoEstado = !conexiones[0].activo;
+  conexiones.forEach(c => c.activo = nuevoEstado);
+  hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO' : 'Bombeo DETENIDO');
+  return nuevoEstado;
+};
+
+window.auditarMaqueta = async () => {
+  hud.aviso('El supervisor IA está analizando la maqueta. Por favor espera...');
+  const analisis = await analizarMaqueta(escena, grafo);
+  panelDatos.textContent = "ANÁLISIS DEL SUPERVISOR IA:\n\n" + analisis;
+  hud.aviso('Análisis completado. Revisa el panel.');
+};
+
+window.exportarJSON = exportarJSON;
+
 hud = montarHud({
   catalogo,
   alColocar(familia, params) {
@@ -237,15 +257,6 @@ hud = montarHud({
   },
   alExportar: exportarJSON,
   alCambiarModo: cambiarModoConexiones
-});
-
-// Conectar botón del Supervisor IA (Se mantiene la llamada antigua por ahora)
-document.getElementById('btn-supervisor').addEventListener('click', async () => {
-  hud.aviso('El supervisor IA está analizando la maqueta. Por favor espera...');
-  const analisis = await analizarMaqueta(escena, grafo);
-  panelDatos.textContent = "ANÁLISIS DEL SUPERVISOR IA:\n\n" + analisis;
-  panelDatos.classList.add('open');
-  hud.aviso('Análisis completado. Revisa el panel.');
 });
 
 renderer.domElement.addEventListener('pointermove', (e) => { if (familiaActiva) actualizarFantasma(e); });
@@ -289,15 +300,6 @@ function redimensionar() {
   renderer.setSize(app.clientWidth, app.clientHeight);
 }
 window.addEventListener('resize', redimensionar);
-
-window.alternarBombeo = () => {
-  const conexiones = grafo.listarConexiones();
-  if (conexiones.length === 0) { hud.aviso('No hay tuberías', true); return false; }
-  const nuevoEstado = !conexiones[0].activo;
-  conexiones.forEach(c => c.activo = nuevoEstado);
-  hud.aviso(nuevoEstado ? 'Bombeo ACTIVADO' : 'Bombeo DETENIDO');
-  return nuevoEstado;
-};
 
 const relojAnimacion = new THREE.Clock();
 function animar() { 
