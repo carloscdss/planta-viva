@@ -146,8 +146,28 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   });
   hud.querySelector('#btn-cerrar-catalogo').addEventListener('click', () => abrirCajon(false));
   fondo.addEventListener('click', () => abrirCajon(false));
-  hud.querySelector('#btn-json').addEventListener('click', () => alExportar?.());
   
+  // Lógica para cerrar/abrir el panel de datos
+  const panelDatos = document.getElementById('data-panel');
+
+  hud.querySelector('#btn-supervisor').addEventListener('click', () => {
+    if (panelDatos.classList.contains('open')) {
+      panelDatos.classList.remove('open');
+    } else {
+      if (window.auditarMaqueta) window.auditarMaqueta();
+      panelDatos.classList.add('open');
+    }
+  });
+
+  hud.querySelector('#btn-json').addEventListener('click', () => {
+    if (panelDatos.classList.contains('open')) {
+      panelDatos.classList.remove('open');
+    } else {
+      if (window.exportarJSON) window.exportarJSON();
+      panelDatos.classList.add('open');
+    }
+  });
+
   hud.querySelector('#btn-conexiones').addEventListener('click', (evento) => {
     const activo = evento.currentTarget.getAttribute('aria-pressed') !== 'true';
     evento.currentTarget.setAttribute('aria-pressed', String(activo));
@@ -160,6 +180,13 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
     if (window.alternarBombeo) {
       const estado = window.alternarBombeo();
       btn.setAttribute('aria-pressed', String(estado));
+      if (estado) {
+        btn.style.background = '#2563eb';
+        btn.style.color = '#fff';
+      } else {
+        btn.style.background = '';
+        btn.style.color = '';
+      }
     }
   });
 
