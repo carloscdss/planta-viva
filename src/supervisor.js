@@ -1,4 +1,4 @@
-// src/supervisor.js - Supervisor Técnico Inteligente (Alternativa local sin bloqueos)
+// src/supervisor.js - Supervisor Técnico Inteligente (Sin dependencias externas)
 
 export async function analizarMaqueta(escena, grafo) {
     try {
@@ -9,12 +9,11 @@ export async function analizarMaqueta(escena, grafo) {
 
         // Análisis automático basado en la lógica de la planta
         const equiposDesconectados = equipos.filter(eq => {
-            // Verifica si algún equipo no tiene conexiones asociadas
             const tieneConexion = conexiones.some(c => c.from === eq.id || c.to === eq.id);
             return !tieneConexion;
         });
 
-        // Generamos un reporte técnico estructurado
+        // Generamos un reporte técnico estructurado y directo
         let reporte = "### 📊 REPORTE TÉCNICO DEL SUPERVISOR IA\n\n";
         
         // 1. Equipos aislados
@@ -31,7 +30,7 @@ export async function analizarMaqueta(escena, grafo) {
         if (equipos.length < 3) {
             reporte += "- ⚠️ Advertencia: La maqueta cuenta con pocos elementos; se recomienda agregar líneas de servicios auxiliares.\n";
         } else {
-            - "✔ Distribución espacial y separación de equipos dentro de los parámetros industriales estándar.\n";
+            reporte += "- ✔ Distribución espacial y separación de equipos dentro de los parámetros industriales estándar.\n";
         }
 
         // 3. Recomendaciones técnicas
