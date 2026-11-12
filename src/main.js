@@ -7,7 +7,8 @@ import { catalogo, crearComponente } from './catalogo/catalogo.js';
 import { Grafo } from './modelo/grafo.js';
 import { ajustarAGrilla, ajustarAEquipos, huella, solapa } from './edicion/colocacion.js';
 import { montarHud } from './ui/hud.js';
-import { analizarMaqueta } from './supervisor.js'; // <-- Importamos el Supervisor
+import { analizarMaqueta } from './supervisor.js'; // <-- Se mantiene por ahora, pero cambiaremos su lógica luego
+import { registrar } from './nucleo/registro.js'; // <-- NUEVO: Para el supervisor local
 
 const app = document.querySelector('#app');
 const panelDatos = document.querySelector('#data-panel');
@@ -38,6 +39,14 @@ configurarIluminacion(escena);
 crearRejilla(escena);
 
 const grafo = new Grafo();
+
+// --- PASO 0: REGISTRO GLOBAL PARA EL SUPERVISOR ---
+registrar('escena', escena);
+registrar('renderer', renderer);
+registrar('camara', camara);
+registrar('grafo', grafo);
+// --------------------------------------------------
+
 const rayo = new THREE.Raycaster();
 const puntero = new THREE.Vector2();
 const plano = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -230,7 +239,7 @@ hud = montarHud({
   alCambiarModo: cambiarModoConexiones
 });
 
-// Conectar botón del Supervisor IA
+// Conectar botón del Supervisor IA (Se mantiene la llamada antigua por ahora)
 document.getElementById('btn-supervisor').addEventListener('click', async () => {
   hud.aviso('El supervisor IA está analizando la maqueta. Por favor espera...');
   const analisis = await analizarMaqueta(escena, grafo);
