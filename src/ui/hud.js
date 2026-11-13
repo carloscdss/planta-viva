@@ -11,7 +11,6 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo,
         <span class="marca-icono" aria-hidden="true">PV</span><span class="marca-texto"><strong>Planta Viva</strong><small>Editor industrial 3D</small></span>
       </a>
       
-      <!-- NUEVOS BOTONES DE DESHACER / REHACER -->
       <div class="herramientas-editor" style="display: flex; gap: 5px; margin-left: 15px; border-left: 1px solid #444; padding-left: 15px;">
         <button class="accion" id="btn-undo" type="button" title="Deshacer (Ctrl+Z)">↩️</button>
         <button class="accion" id="btn-redo" type="button" title="Rehacer (Ctrl+Y)">↪️</button>
@@ -34,6 +33,14 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo,
       <div id="lista" class="cajon-lista"></div>
       <footer class="cajon-pie"><span class="estado-punto"></span> Fase 3 · Edición paramétrica</footer>
     </aside>
+    
+    <!-- Panel de Herramientas de Edición -->
+    <div id="herramientas-edicion" class="herramientas-edicion oculto">
+      <button class="btn-herramienta" id="btn-mover" title="Mover Equipo">✥ Mover</button>
+      <button class="btn-herramienta" id="btn-rotar" title="Rotar 90°">↻ Rotar</button>
+      <button class="btn-herramienta btn-peligro" id="btn-eliminar" title="Eliminar Equipo">🗑 Eliminar</button>
+    </div>
+
     <section id="propiedades" class="propiedades oculto" aria-live="polite" aria-label="Propiedades del equipo seleccionado"></section>
     <div id="avisos" class="avisos" aria-live="polite" aria-atomic="true"></div>
     <aside id="leyenda" class="leyenda oculto" aria-label="Leyenda de tipos de puertos">
@@ -47,6 +54,7 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo,
   const botonMenu = hud.querySelector('#btn-catalogo');
   const fondo = hud.querySelector('#fondo-cajon');
   const panelDatos = document.getElementById('data-panel');
+  const panelHerramientas = hud.querySelector('#herramientas-edicion');
   const escapar = (valor) => String(valor ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
   function abrirCajon(abierto) {
@@ -137,11 +145,17 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo,
   }
 
   function mostrarPropiedades(componente) {
-    if (!componente) { propiedades.classList.add('oculto'); propiedades.replaceChildren(); return; }
+    if (!componente) { 
+      propiedades.classList.add('oculto'); 
+      propiedades.replaceChildren(); 
+      panelHerramientas.classList.add('oculto');
+      return; 
+    }
     const definicion = catalogo.find((item) => item.id === componente.descriptorId);
     propiedades.innerHTML = `<button class="accion cerrar" type="button" aria-label="Cerrar propiedades">×</button><span class="sobretitulo">EQUIPO SELECCIONADO</span><h2>${escapar(componente.nombre ?? definicion?.nombre ?? componente.tipo)}</h2><span class="tag">${escapar(componente.tag)}</span><dl><dt>Familia</dt><dd>${escapar(componente.familia)}</dd><dt>Dimensiones</dt><dd>${escapar(componente.dimensiones.ancho)} × ${escapar(componente.dimensiones.alto)} × ${escapar(componente.dimensiones.profundidad)} m</dd><dt>Puertos</dt><dd>${componente.puertos.length}</dd></dl>`;
     propiedades.querySelector('.cerrar').addEventListener('click', () => mostrarPropiedades(null));
     propiedades.classList.remove('oculto');
+    panelHerramientas.classList.remove('oculto');
   }
 
   // Eventos
@@ -154,9 +168,12 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo,
   hud.querySelector('#btn-cerrar-catalogo').addEventListener('click', () => abrirCajon(false));
   fondo.addEventListener('click', () => abrirCajon(false));
   
-  // Botones Undo / Redo
   hud.querySelector('#btn-undo').addEventListener('click', alDeshacer);
   hud.querySelector('#btn-redo').addEventListener('click', alRehacer);
+  
+  hud.querySelector('#btn-mover').addEventListener('click', () => { if (window.moverEquipoSeleccionado) window.moverEquipoSeleccionado(); });
+  hud.querySelector('#btn-rotar').addEventListener('click', () => { if (window.rotarEquipoSeleccionado) window.rotarEquipoSeleccionado(); });
+  hud.querySelector('#btn-eliminar').addEventListener('click', () => { if (window.eliminarEquipoSeleccionado) window.eliminarEquipoSeleccionado(); });
 
   hud.querySelector('#btn-supervisor').addEventListener('click', () => {
     if (panelDatos.classList.contains('open')) { panelDatos.classList.remove('open'); } 
