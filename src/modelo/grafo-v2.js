@@ -60,19 +60,26 @@ export class GrafoV2 {
         const componente = this.componentes.get(id);
         if (!componente) return;
 
-        const posVieja = componente.posicion.clone();
+        // Guardamos copia segura de la posición y rotación viejas
+        const posVieja = { x: componente.posicion.x, y: componente.posicion.y, z: componente.posicion.z };
         const rotVieja = componente.rotacionY;
 
         const comando = new Comando(
             () => {
-                componente.posicion.copy(nuevaPosicion);
+                // Aplicamos los nuevos valores
+                componente.posicion.x = nuevaPosicion.x;
+                componente.posicion.y = nuevaPosicion.y;
+                componente.posicion.z = nuevaPosicion.z;
                 componente.rotacionY = nuevaRotacion;
-                componente.actualizarMalla(); // Si el componente tiene un método para actualizar su 3D
+                if (componente.actualizarMalla) componente.actualizarMalla();
             },
             () => {
-                componente.posicion.copy(posVieja);
+                // Restauramos los valores viejos
+                componente.posicion.x = posVieja.x;
+                componente.posicion.y = posVieja.y;
+                componente.posicion.z = posVieja.z;
                 componente.rotacionY = rotVieja;
-                componente.actualizarMalla();
+                if (componente.actualizarMalla) componente.actualizarMalla();
             }
         );
         this.gestorComandos.ejecutar(comando);
