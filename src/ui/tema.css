@@ -1,5 +1,3 @@
-/* src/ui/tema.css */
-
 @import url('./hud.css');
 
 :root {
@@ -25,7 +23,7 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: var(--bg) !important; /* Fuerza fondo oscuro */
+  background-color: var(--bg) !important; /* Fondo oscuro forzado */
   color: var(--text);
   font: 14px/1.45 var(--sans);
   -webkit-font-smoothing: antialiased;
@@ -34,7 +32,7 @@ html, body {
 button, input, select { font: inherit; }
 button { color: inherit; cursor: pointer; }
 
-/* El contenedor principal de la app */
+/* EL CONTENEDOR PRINCIPAL (Asegura que el canvas tenga tamaño) */
 #app {
   position: relative;
   width: 100vw;
@@ -44,7 +42,7 @@ button { color: inherit; cursor: pointer; }
   background-color: var(--bg);
 }
 
-/* El canvas 3D se adapta al contenedor */
+/* EL CANVAS 3D (Ocupa todo el espacio) */
 #app > canvas {
   display: block;
   position: absolute;
@@ -56,7 +54,7 @@ button { color: inherit; cursor: pointer; }
   z-index: 1; /* El 3D va al fondo */
 }
 
-/* El panel de datos (JSON) */
+/* EL PANEL DE DATOS JSON (Flota encima) */
 #data-panel {
   position: absolute;
   z-index: 8;
@@ -79,10 +77,24 @@ button { color: inherit; cursor: pointer; }
   display: block;
 }
 
-/* Utilidad para ocultar */
+/* EL HUD (Flota encima del canvas) */
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+#hud > * {
+  pointer-events: auto;
+}
+
 .oculto { display: none !important; }
 
-/* Estilos para la barra de herramientas de edición (Mover/Rotar/Eliminar) */
+/* ESTILOS PARA LOS BOTONES DE HERRAMIENTAS (Mover/Rotar/Eliminar) */
 .herramientas-edicion {
   position: absolute;
   bottom: 30px;
