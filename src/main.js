@@ -4,7 +4,7 @@ import { CONFIG } from './config.js';
 import { configurarIluminacion } from './nucleo/iluminacion.js';
 import { crearRejilla } from './edicion/rejilla.js';
 import { catalogo, crearComponente } from './catalogo/catalogo.js';
-import { Grafo } from './modelo/grafo.js';
+import { GrafoV2 } from './modelo/grafo-v2.js'; // <-- NUEVO GRAFO
 import { ajustarAGrilla, ajustarAEquipos, huella, solapa } from './edicion/colocacion.js';
 import { montarHud } from './ui/hud.js';
 import { analizarMaqueta } from './supervisor.js';
@@ -38,7 +38,8 @@ controles.maxDistance = 35;
 configurarIluminacion(escena);
 crearRejilla(escena);
 
-const grafo = new Grafo();
+// --- NUEVO NÚCLEO DE DATOS ---
+const grafo = new GrafoV2();
 
 registrar('escena', escena);
 registrar('renderer', renderer);
@@ -124,15 +125,17 @@ function actualizarFantasma(evento) {
   posicionValida = !colision;
   pintarFantasma();
 }
+
 function componenteDe(objeto) {
   let actual = objeto;
   while (actual && !actual.userData.componenteId) actual = actual.parent;
-  return actual ? grafo.obtener(actual.userData.componenteId) : null;
+  return actual ? grafo.componentes.get(actual.userData.componenteId) : null;
 }
 
 function seleccionar(evento) {
   actualizarRayo(evento);
-  const hits = rayo.intersectObjects(grafo.listar().map((c) => c.grupo), true);
+  const grupos = Array.from(grafo.componentes.values()).map(c => c.grupo);
+  const hits = rayo.intersectObjects(grupos, true);
   
   let hit = null;
   if (modoConexiones) {
@@ -162,7 +165,15 @@ function colocar() {
   componente.grupo.position.copy(fantasma.grupo.position);
   componente.grupo.quaternion.copy(fantasma.grupo.quaternion);
   
-  grafo.agregar(componente);
+  // Preparar el componente para el GrafoV2 (posiciones internas)
+  componente.posicion = componente.grupo.position.clone();
+  componente.rotacionY = componente.grupo.rotation.y;
+  componente.actualizarMalla = () => {
+      componente.grupo.position.copy(componente.posicion);
+      componente.grupo.rotation.y = componente.rotacionY;
+  };
+  
+  grafo.agregarComponente(componente);
   escena.add(componente.grupo);
   actualizarVisibilidadPuertos(modoConexiones);
   
@@ -175,7 +186,7 @@ function colocar() {
 // Función de Auto-Conexión (corregida para solo conectar equipos cercanos)
 function autoConectarDesdeEquipo(componente) {
   const puertosLibres = [];
-  grafo.listar().forEach(c => {
+  grafo.componentes.forEach(c => {
     if (c.id === componente.id) return;
     c.puertos.forEach(p => {
       if (!p.conectadoA && p.tipo === 'proceso') {
@@ -229,7 +240,7 @@ async function exportarJSON() {
 
 // Exponer funciones globales para el HUD
 window.alternarBombeo = () => {
-  const conexiones = grafo.listarConexiones();
+  const conexiones = Array.from(grafo.conexiones.values());
   if (conexiones.length === 0) { hud.aviso('No hay tuberías', true); return false; }
   const nuevoEstado = !conexiones[0].activo;
   conexiones.forEach(c => c.activo = nuevoEstado);
@@ -256,7 +267,25 @@ hud = montarHud({
     aviso('Vista previa activa: toca un espacio libre para colocar');
   },
   alExportar: exportarJSON,
-  alCambiarModo: cambiarModoConexiones
+  alCambiarModo: cambiarModoConexiones,
+  alDeshacer: () => {
+      if (grafo.undo()) {
+          aviso('Acción deshecha');
+          actualizarJSON();
+          grafo.componentes.forEach(c => { if(c.actualizarMalla) c.actualizarMalla(); });
+      } else {
+          aviso('Nada que deshacer', true);
+      }
+  },
+  alRehacer: () => {
+      if (grafo.redo()) {
+          aviso('Acción rehecha');
+          actualizarJSON();
+          grafo.componentes.forEach(c => { if(c.actualizarMalla) c.actualizarMalla(); });
+      } else {
+          aviso('Nada que rehacer', true);
+      }
+  }
 });
 
 renderer.domElement.addEventListener('pointermove', (e) => { if (familiaActiva) actualizarFantasma(e); });
@@ -281,7 +310,15 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 
 window.addEventListener('keydown', (e) => {
   const controlEnfocado = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName);
-  if (e.key === 'Escape') {
+  
+  // Atajos de teclado para Undo/Redo
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      hud.alDeshacer();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      hud.alRehacer();
+  } else if (e.key === 'Escape') {
     if (familiaActiva) { familiaActiva = null; paramsActivos = {}; limpiarFantasma(); aviso('Cancelado'); }
     puertoPendiente = null;
     hud.abrirCajon(false);
@@ -305,7 +342,7 @@ const relojAnimacion = new THREE.Clock();
 function animar() { 
   requestAnimationFrame(animar); 
   const dt = relojAnimacion.getDelta();
-  grafo.listarConexiones().forEach(c => c.animarFlujo(dt));
+  Array.from(grafo.conexiones.values()).forEach(c => { if(c.animarFlujo) c.animarFlujo(dt); });
   controles.update(); 
   renderer.render(escena, camara); 
 }
