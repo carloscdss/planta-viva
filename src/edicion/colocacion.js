@@ -1,3 +1,4 @@
+// src/edicion/colocacion.js
 import { CONFIG } from '../config.js';
 import { obtenerDescriptor } from '../catalogo/catalogo.js';
 
@@ -37,7 +38,8 @@ export function solapa(grafo, familia, params = {}, posicion, rotacionY = 0) {
   const centroNuevo = caja(posicion, dimNueva);
   const margen = CONFIG.edicion.margenSolape;
 
-  for (const existente of grafo.listar()) {
+  // ADAPTADO PARA GRAFO V2: Iteramos sobre el Map de componentes
+  for (const existente of grafo.componentes.values()) {
     const centroExistente = caja(existente.grupo.position, huella(existente));
     const intersecaX = centroNuevo.minX < centroExistente.maxX + margen && centroNuevo.maxX > centroExistente.minX - margen;
     const intersecaZ = centroNuevo.minZ < centroExistente.maxZ + margen && centroNuevo.maxZ > centroExistente.minZ - margen;
@@ -55,7 +57,8 @@ export function ajustarAEquipos(grafo, posicion, dim) {
   let distanciaX = radio;
   let distanciaZ = radio;
 
-  for (const existente of grafo.listar()) {
+  // ADAPTADO PARA GRAFO V2: Iteramos sobre el Map de componentes
+  for (const existente of grafo.componentes.values()) {
     const otra = caja(existente.grupo.position, huella(existente));
     const candidatosX = [otra.minX - dim.ancho / 2, otra.maxX + dim.ancho / 2];
     const candidatosZ = [otra.minZ - dim.fondo / 2, otra.maxZ + dim.fondo / 2];
