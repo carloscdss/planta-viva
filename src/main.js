@@ -4,7 +4,7 @@ import { CONFIG } from './config.js';
 import { configurarIluminacion } from './nucleo/iluminacion.js';
 import { crearRejilla } from './edicion/rejilla.js';
 import { catalogo, crearComponente } from './catalogo/catalogo.js';
-import { GrafoV2 } from './modelo/grafo-v2.js'; // <-- NUEVO GRAFO
+import { GrafoV2 } from './modelo/grafo-v2.js';
 import { ajustarAGrilla, ajustarAEquipos, huella, solapa } from './edicion/colocacion.js';
 import { montarHud } from './ui/hud.js';
 import { analizarMaqueta } from './supervisor.js';
@@ -38,7 +38,6 @@ controles.maxDistance = 35;
 configurarIluminacion(escena);
 crearRejilla(escena);
 
-// --- NUEVO NÚCLEO DE DATOS ---
 const grafo = new GrafoV2();
 
 registrar('escena', escena);
@@ -154,18 +153,17 @@ function cambiarModoConexiones(activo) {
   modoConexiones = activo;
   puertoPendiente = null;
   actualizarVisibilidadPuertos(activo);
-  aviso(activo ? 'Modo conexiones activo: toca un equipo para autoconectar' : 'Modo conexiones desactivado');
+  aviso(activo ? 'Modo conexiones activo' : 'Modo conexiones desactivado');
 }
 
 function colocar() {
-  if (!fantasma?.grupo.visible) { aviso('Mueve el puntero sobre el plano para elegir una posición', true); return; }
-  if (!posicionValida) { aviso(`No se puede colocar: solapa con ${colision?.tag ?? 'otro equipo'}`, true); return; }
+  if (!fantasma?.grupo.visible) { aviso('Mueve el puntero sobre el plano', true); return; }
+  if (!posicionValida) { aviso('No se puede colocar: solapa con otro equipo', true); return; }
   
   const componente = crearComponente(familiaActiva, { params: paramsActivos });
   componente.grupo.position.copy(fantasma.grupo.position);
   componente.grupo.quaternion.copy(fantasma.grupo.quaternion);
   
-  // Preparar el componente para el GrafoV2 (posiciones internas)
   componente.posicion = componente.grupo.position.clone();
   componente.rotacionY = componente.grupo.rotation.y;
   componente.actualizarMalla = () => {
@@ -183,49 +181,6 @@ function colocar() {
   aviso(`${componente.nombre ?? componente.tipo} colocado`);
 }
 
-// Función de Auto-Conexión (corregida para solo conectar equipos cercanos)
-function autoConectarDesdeEquipo(componente) {
-  const puertosLibres = [];
-  grafo.componentes.forEach(c => {
-    if (c.id === componente.id) return;
-    c.puertos.forEach(p => {
-      if (!p.conectadoA && p.tipo === 'proceso') {
-        const posMundo = new THREE.Vector3().copy(p.posicion);
-        c.grupo.localToWorld(posMundo);
-        const dist = componente.grupo.position.distanceTo(posMundo);
-        // Solo consideramos equipos a menos de 4 metros
-        if (dist < 4) {
-          puertosLibres.push({ componente: c, puerto: p, distancia: dist });
-        }
-      }
-    });
-  });
-
-  puertosLibres.sort((a, b) => a.distancia - b.distancia);
-
-  if (puertosLibres.length === 0) {
-    aviso('No hay equipos cercanos con puertos libres (distancia max 4m).', true);
-    return;
-  }
-
-  const mejor = puertosLibres[0];
-  const miPuertoLibre = componente.puertos.find(p => !p.conectadoA && p.tipo === 'proceso');
-
-  if (!miPuertoLibre) {
-    aviso('Este equipo no tiene puertos libres.', true);
-    return;
-  }
-
-  try {
-    const conexion = grafo.conectar(componente.id, miPuertoLibre.id, mejor.componente.id, mejor.puerto.id);
-    escena.add(conexion.malla);
-    actualizarJSON();
-    aviso(`Auto-conectado a ${mejor.componente.nombre} (a ${mejor.distancia.toFixed(1)}m)`);
-  } catch (error) {
-    aviso('No se pudo autoconectar: ' + error.message, true);
-  }
-}
-
 async function exportarJSON() {
   const json = JSON.stringify(grafo.aJSON(), null, 2);
   actualizarJSON();
@@ -238,7 +193,32 @@ async function exportarJSON() {
   }
 }
 
-// Exponer funciones globales para el HUD
+// --- HERRAMIENTAS DE EDICIÓN ---
+window.moverEquipoSeleccionado = () => {
+    if (!seleccionado) return;
+    aviso('Función Mover en desarrollo (arrastra el equipo en el próximo paso).');
+};
+
+window.rotarEquipoSeleccionado = () => {
+    if (!seleccionado) return;
+    const nuevaRotacion = (seleccionado.rotacionY || 0) + Math.PI / 2;
+    grafo.moverComponente(seleccionado.id, seleccionado.posicion.clone(), nuevaRotacion);
+    actualizarJSON();
+    aviso('Equipo rotado 90°');
+};
+
+window.eliminarEquipoSeleccionado = () => {
+    if (!seleccionado) return;
+    const tag = seleccionado.tag;
+    grafo.eliminarComponente(seleccionado.id);
+    escena.remove(seleccionado.grupo);
+    seleccionado = null;
+    hud.mostrarPropiedades(null);
+    actualizarJSON();
+    aviso(`Equipo ${tag} eliminado (Ctrl+Z para recuperar)`);
+};
+
+// --- EXPOSICIÓN GLOBAL ---
 window.alternarBombeo = () => {
   const conexiones = Array.from(grafo.conexiones.values());
   if (conexiones.length === 0) { hud.aviso('No hay tuberías', true); return false; }
@@ -270,18 +250,18 @@ hud = montarHud({
   alCambiarModo: cambiarModoConexiones,
   alDeshacer: () => {
       if (grafo.undo()) {
-          aviso('Acción deshecha');
           actualizarJSON();
           grafo.componentes.forEach(c => { if(c.actualizarMalla) c.actualizarMalla(); });
+          aviso('Acción deshecha');
       } else {
           aviso('Nada que deshacer', true);
       }
   },
   alRehacer: () => {
       if (grafo.redo()) {
-          aviso('Acción rehecha');
           actualizarJSON();
           grafo.componentes.forEach(c => { if(c.actualizarMalla) c.actualizarMalla(); });
+          aviso('Acción rehecha');
       } else {
           aviso('Nada que rehacer', true);
       }
@@ -301,7 +281,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   const resultado = seleccionar(e);
   
   if (modoConexiones && resultado.componente) { 
-    autoConectarDesdeEquipo(resultado.componente);
+    aviso('Auto-conexión en mantenimiento.');
     return;
   }
   
@@ -311,16 +291,14 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 window.addEventListener('keydown', (e) => {
   const controlEnfocado = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName);
   
-  // Atajos de teclado para Undo/Redo
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
-      hud.alDeshacer();
+      if (grafo.undo()) { aviso('Deshecho'); actualizarJSON(); }
   } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
       e.preventDefault();
-      hud.alRehacer();
+      if (grafo.redo()) { aviso('Rehecho'); actualizarJSON(); }
   } else if (e.key === 'Escape') {
     if (familiaActiva) { familiaActiva = null; paramsActivos = {}; limpiarFantasma(); aviso('Cancelado'); }
-    puertoPendiente = null;
     hud.abrirCajon(false);
     panelDatos.classList.remove('open');
   } else if (!controlEnfocado && e.key.toLowerCase() === 'r' && fantasma) {
