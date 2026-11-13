@@ -1,4 +1,4 @@
-export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo }) {
+export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo, alDeshacer, alRehacer }) {
   const hud = document.getElementById('hud');
   if (!hud) throw new Error('No se encontró el contenedor #hud.');
 
@@ -10,6 +10,13 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
       <a class="marca" href="#" aria-label="Planta Viva, inicio" onclick="return false">
         <span class="marca-icono" aria-hidden="true">PV</span><span class="marca-texto"><strong>Planta Viva</strong><small>Editor industrial 3D</small></span>
       </a>
+      
+      <!-- NUEVOS BOTONES DE DESHACER / REHACER -->
+      <div class="herramientas-editor" style="display: flex; gap: 5px; margin-left: 15px; border-left: 1px solid #444; padding-left: 15px;">
+        <button class="accion" id="btn-undo" type="button" title="Deshacer (Ctrl+Z)">↩️</button>
+        <button class="accion" id="btn-redo" type="button" title="Rehacer (Ctrl+Y)">↪️</button>
+      </div>
+
       <nav class="menu-acciones" aria-label="Herramientas del proyecto">
         <button class="accion" id="btn-supervisor" type="button" style="background: #f59e0b; border-color: #d97706; color: white;">🧠 Supervisor IA</button>
         <button class="accion" id="btn-conexiones" type="button" aria-pressed="false"><span aria-hidden="true">⌁</span> Conexiones</button>
@@ -25,7 +32,7 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
         <label class="buscador-contenedor"><span aria-hidden="true">⌕</span><input id="buscador" class="buscador" type="search" placeholder="Buscar equipo…" aria-label="Buscar equipo"></label>
       </div>
       <div id="lista" class="cajon-lista"></div>
-      <footer class="cajon-pie"><span class="estado-punto"></span> Fase 3 · Simulación de flujo</footer>
+      <footer class="cajon-pie"><span class="estado-punto"></span> Fase 3 · Edición paramétrica</footer>
     </aside>
     <section id="propiedades" class="propiedades oculto" aria-live="polite" aria-label="Propiedades del equipo seleccionado"></section>
     <div id="avisos" class="avisos" aria-live="polite" aria-atomic="true"></div>
@@ -39,6 +46,7 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   const propiedades = hud.querySelector('#propiedades');
   const botonMenu = hud.querySelector('#btn-catalogo');
   const fondo = hud.querySelector('#fondo-cajon');
+  const panelDatos = document.getElementById('data-panel');
   const escapar = (valor) => String(valor ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
   function abrirCajon(abierto) {
@@ -136,9 +144,8 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
     propiedades.classList.remove('oculto');
   }
 
-  // Eventos de la interfaz
+  // Eventos
   buscador.addEventListener('input', (e) => pintarCatalogo(e.target.value));
-  
   botonMenu.addEventListener('click', () => {
     const abierto = drawer.classList.contains('abierto');
     abrirCajon(!abierto);
@@ -147,25 +154,18 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   hud.querySelector('#btn-cerrar-catalogo').addEventListener('click', () => abrirCajon(false));
   fondo.addEventListener('click', () => abrirCajon(false));
   
-  // Lógica para cerrar/abrir el panel de datos
-  const panelDatos = document.getElementById('data-panel');
+  // Botones Undo / Redo
+  hud.querySelector('#btn-undo').addEventListener('click', alDeshacer);
+  hud.querySelector('#btn-redo').addEventListener('click', alRehacer);
 
   hud.querySelector('#btn-supervisor').addEventListener('click', () => {
-    if (panelDatos.classList.contains('open')) {
-      panelDatos.classList.remove('open');
-    } else {
-      if (window.auditarMaqueta) window.auditarMaqueta();
-      panelDatos.classList.add('open');
-    }
+    if (panelDatos.classList.contains('open')) { panelDatos.classList.remove('open'); } 
+    else { if (window.auditarMaqueta) window.auditarMaqueta(); panelDatos.classList.add('open'); }
   });
 
   hud.querySelector('#btn-json').addEventListener('click', () => {
-    if (panelDatos.classList.contains('open')) {
-      panelDatos.classList.remove('open');
-    } else {
-      if (window.exportarJSON) window.exportarJSON();
-      panelDatos.classList.add('open');
-    }
+    if (panelDatos.classList.contains('open')) { panelDatos.classList.remove('open'); } 
+    else { if (window.exportarJSON) window.exportarJSON(); panelDatos.classList.add('open'); }
   });
 
   hud.querySelector('#btn-conexiones').addEventListener('click', (evento) => {
@@ -180,13 +180,8 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
     if (window.alternarBombeo) {
       const estado = window.alternarBombeo();
       btn.setAttribute('aria-pressed', String(estado));
-      if (estado) {
-        btn.style.background = '#2563eb';
-        btn.style.color = '#fff';
-      } else {
-        btn.style.background = '';
-        btn.style.color = '';
-      }
+      btn.style.background = estado ? '#2563eb' : '';
+      btn.style.color = estado ? '#fff' : '';
     }
   });
 
@@ -195,6 +190,8 @@ export function montarHud({ catalogo = [], alColocar, alExportar, alCambiarModo 
   return {
     aviso: avisar,
     mostrarPropiedades,
-    abrirCajon
+    abrirCajon,
+    alDeshacer,
+    alRehacer
   };
 }
