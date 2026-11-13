@@ -59,6 +59,7 @@
   </section>
 
   <script type="module">
+    // --- SCRIPT DE DIAGNÓSTICO VISUAL (El que ya tenías) ---
     const panel = document.getElementById('diag-panel');
     const title = document.getElementById('diag-title');
     const list = document.getElementById('diag-list');
@@ -91,6 +92,7 @@
     document.getElementById('diag-close').addEventListener('click', () => { panel.hidden = true; });
 
     try {
+      // Cargar la app principal
       const moduloApp = await import('./src/main.js');
       const app = document.getElementById('app');
       const hud = document.getElementById('hud');
@@ -136,6 +138,51 @@
       errorGlobal(`No se pudo cargar src/main.js: ${error?.message ?? String(error)}`);
       console.error(error);
     }
+  </script>
+
+  <!-- PRUEBA DEL NÚCLEO (Grafo V2) -->
+  <script type="module">
+    import { GrafoV2 } from './src/modelo/grafo-v2.js';
+
+    // Creamos una clase de prueba simple para simular un componente
+    class EquipoPrueba {
+        constructor(id, tag, x) {
+            this.id = id;
+            this.tag = tag;
+            this.posicion = { x: x, y: 0, z: 0, clone: function() { return { x: this.x, y: this.y, z: this.z }; } };
+            this.rotacionY = 0;
+        }
+        aJSON() { return { id: this.id, tag: this.tag }; }
+        actualizarMalla() { console.log(`   -> [3D] Malla de ${this.tag} movida a X: ${this.posicion.x}`); }
+    }
+
+    console.log("%c--- INICIANDO PRUEBA DEL NÚCLEO (Grafo V2) ---", "color: #2fb37a; font-weight: bold; font-size: 14px;");
+    const miGrafo = new GrafoV2();
+    const bomba = new EquipoPrueba("uuid-1", "BOM-101", 10);
+    
+    console.log("1. Agregando bomba (BOM-101)...");
+    miGrafo.agregarComponente(bomba);
+    console.log("   -> Componentes en grafo:", miGrafo.componentes.size);
+
+    console.log("2. Moviendo bomba a X=20...");
+    miGrafo.moverComponente("uuid-1", { x: 20, y: 0, z: 0, clone: function() { return { x: this.x, y: this.y, z: this.z }; } }, 0);
+
+    console.log("3. Deshaciendo movimiento (Undo)...");
+    miGrafo.undo();
+
+    console.log("4. Rehaciendo movimiento (Redo)...");
+    miGrafo.redo();
+
+    console.log("5. Eliminando bomba...");
+    miGrafo.eliminarComponente("uuid-1");
+    console.log("   -> Componentes en grafo:", miGrafo.componentes.size);
+
+    console.log("6. Deshaciendo eliminación...");
+    miGrafo.undo();
+    console.log("   -> Componentes en grafo:", miGrafo.componentes.size);
+
+    console.log("%c--- PRUEBA FINALIZADA ---", "color: #2fb37a; font-weight: bold; font-size: 14px;");
+    console.log("Estado final del grafo:", miGrafo.aJSON());
   </script>
 </body>
 </html>
