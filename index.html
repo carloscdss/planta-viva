@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#101820" />
-  <meta name="app-phase" content="2" />
+  <meta name="app-phase" content="3" />
   <title>Planta Viva — Editor industrial 3D</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./src/ui/tema.css" />
@@ -24,7 +24,7 @@
       box-sizing: border-box; padding: 14px 16px; border: 2px solid #e0a83e;
       border-radius: 10px; background: rgba(13, 20, 25, .97); color: #f5f7f8;
       box-shadow: 0 10px 30px rgba(0, 0, 0, .65); font: 13px/1.45 system-ui, sans-serif;
-      z-index: 9999;
+      z-index: 9999; display: none; /* Oculto por defecto */
     }
     #diag-panel.ok { border-color: #2fb37a; }
     #diag-panel.error { border-color: #e05555; }
@@ -37,10 +37,6 @@
     .ok-text { color: #62dda5; font-weight: 700; }
     .err-text { color: #ff8585; font-weight: 700; }
     .warn-text { color: #ffd273; font-weight: 700; }
-    @media (max-width: 520px) {
-      #diag-panel { top: 6px; max-height: 48vh; padding: 10px 12px; font-size: 12px; }
-      #diag-title { font-size: 14px; }
-    }
   </style>
 </head>
 <body>
@@ -51,7 +47,7 @@
 
   <section id="diag-panel" aria-labelledby="diag-title" aria-live="polite">
     <div id="diag-heading">
-      <h1 id="diag-title">Diagnóstico: comprobando versión…</h1>
+      <h1 id="diag-title">Diagnóstico</h1>
       <button id="diag-close" type="button" aria-label="Ocultar diagnóstico">Ocultar</button>
     </div>
     <ul id="diag-list"></ul>
@@ -59,7 +55,6 @@
   </section>
 
   <script type="module">
-    // --- SCRIPT DE DIAGNÓSTICO VISUAL ---
     const panel = document.getElementById('diag-panel');
     const title = document.getElementById('diag-title');
     const list = document.getElementById('diag-list');
@@ -75,114 +70,27 @@
     }
 
     function errorGlobal(mensaje) {
+      panel.style.display = 'block';
       panel.classList.remove('ok');
       panel.classList.add('error');
       title.textContent = 'No se pudo iniciar completamente la aplicación';
       resultado('error', mensaje);
-      help.textContent = 'Revisa la consola del navegador y confirma que GitHub Pages terminó el último despliegue. Si acabas de publicar cambios, fuerza la recarga con Ctrl+Shift+R (o Cmd+Shift+R en Mac).';
+      help.textContent = 'Revisa la consola del navegador y confirma que GitHub Pages terminó el último despliegue.';
     }
 
     window.addEventListener('error', (evento) => {
       const archivo = evento.filename ? ` (${evento.filename.split('/').pop()}${evento.lineno ? `:${evento.lineno}` : ''})` : '';
       errorGlobal(`${evento.message || 'Error de JavaScript'}${archivo}`);
     });
-    window.addEventListener('unhandledrejection', (evento) => {
-      errorGlobal(`Error asíncrono: ${evento.reason?.message ?? String(evento.reason ?? 'desconocido')}`);
-    });
-    document.getElementById('diag-close').addEventListener('click', () => { panel.hidden = true; });
+
+    document.getElementById('diag-close').addEventListener('click', () => { panel.style.display = 'none'; });
 
     try {
-      // Cargar la app principal
-      const moduloApp = await import('./src/main.js');
-      const app = document.getElementById('app');
-      const hud = document.getElementById('hud');
-      const canvas = app.querySelector('canvas');
-      const textoHud = (hud.textContent || '').toLocaleLowerCase();
-      const tieneAccionesFase2 = Boolean(
-        hud.querySelector('#btn-conexiones') &&
-        hud.querySelector('#btn-json') &&
-        hud.querySelector('#cajon')
-      );
-      const moduloCatalogo = await import('./src/catalogo/catalogo.js');
-      const catalogo = moduloCatalogo.catalogo ?? [];
-      const tieneTuberia = catalogo.some((elemento) => elemento.familia === 'tuberia' || elemento.id === 'tuberia');
-      const faseHtml = document.querySelector('meta[name="app-phase"]')?.content ?? 'no definida';
-      const faseDeclarada = Number(moduloApp.FASE_PROYECTO ?? app.dataset.fase ?? NaN);
-      const fase2Confirmada = Boolean(canvas && tieneAccionesFase2 && tieneTuberia && catalogo.length >= 3);
-      const pareceFase1 = /fase\s*1/.test(textoHud) && !fase2Confirmada;
-
-      panel.classList.remove('error', 'ok');
-      list.replaceChildren();
-      resultado('ok', `HTML servido: marcador de fase ${faseHtml}. URL: ${window.location.href}`);
-      resultado(canvas ? 'ok' : 'error', canvas ? 'Canvas 3D creado por Three.js.' : 'No se encontró el canvas 3D.');
-      resultado(tieneAccionesFase2 ? 'ok' : 'error', tieneAccionesFase2 ? 'Interfaz del editor detectada: catálogo, conexiones y exportación.' : 'Faltan controles del editor (catálogo, conexiones o exportación).');
-      resultado(tieneTuberia ? 'ok' : 'error', `Catálogo: ${catalogo.length} elementos; ${tieneTuberia ? 'incluye tuberías' : 'no se encontró la familia de tuberías'}.`);
-      resultado(Number.isFinite(faseDeclarada) ? 'ok' : 'aviso', Number.isFinite(faseDeclarada) ? `Fase declarada por JavaScript: ${faseDeclarada}.` : 'El módulo no declara un número de fase; se verificaron las funciones reales de la interfaz.');
-
-      if (fase2Confirmada) {
-        title.textContent = '✅ Proyecto cargado: FASE 2';
-        panel.classList.add('ok');
-        resultado('ok', 'Fase 2 confirmada por funciones activas, canvas 3D y catálogo con tuberías.');
-        help.textContent = 'Si la página que ves no coincide con este diagnóstico, el navegador o GitHub Pages podría estar mostrando una versión anterior. Fuerza la recarga y revisa el último despliegue de Pages.';
-      } else if (pareceFase1) {
-        title.textContent = '⚠️ La interfaz cargada parece ser FASE 1';
-        resultado('warn', 'Se encontró la etiqueta Fase 1, pero no están presentes todas las funciones verificables de Fase 2.');
-        help.textContent = 'Comprueba que Pages despliegue la rama main y que el último despliegue haya finalizado. Después fuerza la recarga del navegador.';
-      } else {
-        title.textContent = '⚠️ Fase no confirmada: carga incompleta o versión distinta';
-        panel.classList.add('error');
-        resultado('error', 'No se puede afirmar que sea Fase 1 o Fase 2 porque faltan comprobaciones de la aplicación.');
-        help.textContent = 'La ausencia de una etiqueta en el HUD no significa que GitHub no haya actualizado el archivo. Revisa los errores de consola, el último despliegue de Pages y luego fuerza la recarga.';
-      }
+      await import('./src/main.js');
     } catch (error) {
       errorGlobal(`No se pudo cargar src/main.js: ${error?.message ?? String(error)}`);
       console.error(error);
     }
-  </script>
-
-  <!-- PRUEBA DEL NÚCLEO (Grafo V2) -->
-  <script type="module">
-    import * as THREE from 'three';
-    import { GrafoV2 } from './src/modelo/grafo-v2.js';
-
-    class EquipoPrueba {
-        constructor(id, tag, x) {
-            this.id = id;
-            this.tag = tag;
-            this.posicion = new THREE.Vector3(x, 0, 0); 
-            this.rotacionY = 0;
-        }
-        aJSON() { return { id: this.id, tag: this.tag, posicion: this.posicion.toArray() }; }
-        actualizarMalla() { console.log(`   -> [3D] Malla de ${this.tag} movida a X: ${this.posicion.x.toFixed(2)}`); }
-    }
-
-    console.log("%c--- INICIANDO PRUEBA DEL NÚCLEO (Grafo V2) ---", "color: #2fb37a; font-weight: bold; font-size: 14px;");
-    const miGrafo = new GrafoV2();
-    const bomba = new EquipoPrueba("uuid-1", "BOM-101", 10);
-    
-    console.log("1. Agregando bomba (BOM-101)...");
-    miGrafo.agregarComponente(bomba);
-    console.log("   -> Componentes en grafo:", miGrafo.componentes.size);
-
-    console.log("2. Moviendo bomba a X=20...");
-    miGrafo.moverComponente("uuid-1", new THREE.Vector3(20, 0, 0), 0);
-
-    console.log("3. Deshaciendo movimiento (Undo)...");
-    miGrafo.undo();
-
-    console.log("4. Rehaciendo movimiento (Redo)...");
-    miGrafo.redo();
-
-    console.log("5. Eliminando bomba...");
-    miGrafo.eliminarComponente("uuid-1");
-    console.log("   -> Componentes en grafo:", miGrafo.componentes.size);
-
-    console.log("6. Deshaciendo eliminación...");
-    miGrafo.undo();
-    console.log("   -> Componentes en grafo:", miGrafo.componentes.size);
-
-    console.log("%c--- PRUEBA FINALIZADA ---", "color: #2fb37a; font-weight: bold; font-size: 14px;");
-    console.log("Estado final del grafo:", miGrafo.aJSON());
   </script>
 </body>
 </html>
