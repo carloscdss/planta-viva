@@ -8,7 +8,6 @@
   <title>Planta Viva — Editor industrial 3D</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./src/ui/tema.css" />
-  <link rel="stylesheet" href="./src/ui/hud.css" />
   <script type="importmap">
     {
       "imports": {
@@ -17,80 +16,12 @@
       }
     }
   </script>
-  <style>
-    #diag-panel {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-      width: min(620px, calc(100vw - 24px)); max-height: min(62vh, 540px); overflow: auto;
-      box-sizing: border-box; padding: 14px 16px; border: 2px solid #e0a83e;
-      border-radius: 10px; background: rgba(13, 20, 25, .97); color: #f5f7f8;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, .65); font: 13px/1.45 system-ui, sans-serif;
-      z-index: 9999; display: none; /* Oculto por defecto */
-    }
-    #diag-panel.ok { border-color: #2fb37a; }
-    #diag-panel.error { border-color: #e05555; }
-    #diag-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    #diag-title { margin: 0; font-size: 15px; }
-    #diag-close { flex: 0 0 auto; border: 1px solid #77838a; border-radius: 6px; padding: 4px 9px; background: transparent; color: inherit; cursor: pointer; }
-    #diag-list { margin: 10px 0; padding-left: 22px; }
-    #diag-list li { margin: 4px 0; overflow-wrap: anywhere; }
-    #diag-help { margin: 8px 0 0; color: #c3cbd0; }
-    .ok-text { color: #62dda5; font-weight: 700; }
-    .err-text { color: #ff8585; font-weight: 700; }
-    .warn-text { color: #ffd273; font-weight: 700; }
-  </style>
 </head>
 <body>
   <main id="app" aria-label="Editor de planta industrial 3D">
     <div id="hud"></div>
     <pre id="data-panel" aria-label="Datos JSON de la planta"></pre>
   </main>
-
-  <section id="diag-panel" aria-labelledby="diag-title" aria-live="polite">
-    <div id="diag-heading">
-      <h1 id="diag-title">Diagnóstico</h1>
-      <button id="diag-close" type="button" aria-label="Ocultar diagnóstico">Ocultar</button>
-    </div>
-    <ul id="diag-list"></ul>
-    <p id="diag-help"></p>
-  </section>
-
-  <script type="module">
-    const panel = document.getElementById('diag-panel');
-    const title = document.getElementById('diag-title');
-    const list = document.getElementById('diag-list');
-    const help = document.getElementById('diag-help');
-
-    function resultado(tipo, texto) {
-      const item = document.createElement('li');
-      const estado = document.createElement('span');
-      estado.className = tipo === 'ok' ? 'ok-text' : tipo === 'error' ? 'err-text' : 'warn-text';
-      estado.textContent = tipo === 'ok' ? '[OK] ' : tipo === 'error' ? '[ERROR] ' : '[AVISO] ';
-      item.append(estado, document.createTextNode(texto));
-      list.append(item);
-    }
-
-    function errorGlobal(mensaje) {
-      panel.style.display = 'block';
-      panel.classList.remove('ok');
-      panel.classList.add('error');
-      title.textContent = 'No se pudo iniciar completamente la aplicación';
-      resultado('error', mensaje);
-      help.textContent = 'Revisa la consola del navegador y confirma que GitHub Pages terminó el último despliegue.';
-    }
-
-    window.addEventListener('error', (evento) => {
-      const archivo = evento.filename ? ` (${evento.filename.split('/').pop()}${evento.lineno ? `:${evento.lineno}` : ''})` : '';
-      errorGlobal(`${evento.message || 'Error de JavaScript'}${archivo}`);
-    });
-
-    document.getElementById('diag-close').addEventListener('click', () => { panel.style.display = 'none'; });
-
-    try {
-      await import('./src/main.js');
-    } catch (error) {
-      errorGlobal(`No se pudo cargar src/main.js: ${error?.message ?? String(error)}`);
-      console.error(error);
-    }
-  </script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
