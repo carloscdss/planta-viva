@@ -1,0 +1,21 @@
+{
+  "meta": { "nombre": "Planta Piloto de Agua", "version": "3.0.0" },
+  "equipos": [
+    {
+      "uuid": "e-tanque-01",
+      "tag": "TNQ-101",
+      "familia": "tanque",
+      "posicion": [0, 1.2, 0],
+      "dimensiones": { "radio": 1, "alto": 2.4 },
+      "color": "#aaaaaa"
+    },
+    {
+      "uuid": "e-bomba-01",
+      "tag": "BOM-101",
+      "familia": "bomba",
+      "posicion": [3, 0.5, 0],
+      "dimensiones": { "largo": 1, "alto": 1, "fondo": 1 },
+      "color": "#d97706"
+    }
+  ]
+}
