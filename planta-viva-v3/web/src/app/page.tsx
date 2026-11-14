@@ -1,7 +1,7 @@
 // src/app/page.tsx
 'use client';
-import { useState } from 'react'; // <-- ¡ESTO FALTABA!
-import { Canvas } from '@react-three/fiber';
+import { useRef, useState } from 'react'; // <-- Asegurar useRef y useState
+import { Canvas, useFrame } from '@react-three/fiber'; // <-- Asegurar useFrame
 import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 import { useEditor } from '@/hooks/useEditor';
@@ -13,7 +13,26 @@ import { PanelPropiedades } from '@/components/PanelPropiedades';
 import { BarraSuperior } from '@/components/BarraSuperior';
 import { TooltipSimulacion } from '@/components/TooltipSimulacion';
 import { PanelBOQ } from '@/components/PanelBOQ';
-import { calcularBOQ } from '@/lib/boq';
+import { calcularBOQ } from '@/lib/boq'; // <-- ¡ESTA ES LA LÍNEA QUE FALTABA!
+import { registrarRendimiento } from '@/lib/diagnostico';
+
+function MedidorRendimiento() {
+  const frames = useRef(0);
+  const ultimo = useRef(performance.now());
+  useFrame((state) => {
+    frames.current++;
+    const ahora = performance.now();
+    if (ahora - ultimo.current >= 1000) {
+      registrarRendimiento(frames.current, {
+        calls: state.gl.info.render.calls,
+        triangles: state.gl.info.render.triangles,
+      });
+      frames.current = 0;
+      ultimo.current = ahora;
+    }
+  });
+  return null;
+}
 
 export default function Home() {
   // 1. OBTENEMOS TODA LA LÓGICA DEL HOOK
@@ -32,6 +51,7 @@ export default function Home() {
         <directionalLight position={[10, 12, 8]} intensity={1.4} castShadow shadow-mapSize={[2048, 2048]} />
         
         <Puntero onMove={editor.onMove} />
+        <MedidorRendimiento />
         <Grid position={[0, 0.01, 0]} args={[40, 40]} cellSize={1} cellThickness={0.6} cellColor="#2d3b3d" sectionSize={5} sectionThickness={1.1} sectionColor="#52665f" fadeDistance={55} fadeStrength={1.5} infiniteGrid />
         
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow 
@@ -40,18 +60,24 @@ export default function Home() {
             const dist = Math.hypot(e.nativeEvent.clientX - editor.down.current.x, e.nativeEvent.clientY - editor.down.current.y); 
             editor.down.current = null; 
             if (dist > 7) return; 
-            if (editor.activa) editor.colocar(); else editor.setSeleccionado(null); 
+            if (e.point) editor.onMove(e.point.x, e.point.z);
+            if (editor.modoMover) editor.soltarMover();
+else if (editor.activa) editor.colocar();
+else editor.setSeleccionado(null);
           }}>
           <planeGeometry args={[80, 80]} />
           <meshStandardMaterial color="#20272a" roughness={0.96} metalness={0.02} />
         </mesh>
 
-        {editor.equipos.map((eq) => (
-          <group key={eq.uuid} onClick={(e) => { e.stopPropagation(); editor.seleccionar(eq.uuid); }}
-            onPointerOver={() => editor.setHoverEquipo(eq.uuid)} onPointerOut={() => editor.setHoverEquipo(null)}>
-            <Equipo3D data={eq} ghost={false} highlight={eq.uuid === editor.seleccionado} onPortClick={editor.modoConexion ? editor.seleccionar : undefined} />
-          </group>
-        ))}
+{editor.equipos
+  .filter(eq => !(editor.modoMover && eq.uuid === editor.seleccionado))
+  .map((eq) => (
+    <group key={eq.uuid} onClick={(e) => { e.stopPropagation(); editor.seleccionar(eq.uuid); }}
+      onPointerOver={() => editor.setHoverEquipo(eq.uuid)} onPointerOut={() => editor.setHoverEquipo(null)}>
+      <Equipo3D data={eq} ghost={false} highlight={eq.uuid === editor.seleccionado} onPortClick={editor.modoConexion ? editor.seleccionar : undefined} />
+    </group>
+  ))}
+{editor.fantasmaMover && <Equipo3D ghost data={editor.fantasmaMover} />}
         
         {editor.conexionesResueltas.map(conn => (<TuberiaDinamica key={conn.id} data={conn} />))}
         {editor.fantasma && <Equipo3D ghost data={editor.fantasma} />}
@@ -60,7 +86,17 @@ export default function Home() {
 
       {/* 3. COMPONENTES DE UI (Reciben los datos y funciones del hook) */}
       <SidebarCatalogo {...editor} />
-      {editor.equipoSel && <PanelPropiedades equipo={editor.equipoSel} onClose={() => editor.setSeleccionado(null)} onDelete={editor.eliminarEquipo} />}
+      {editor.equipoSel && (
+  <PanelPropiedades
+    equipo={editor.equipoSel}
+    onClose={() => editor.setSeleccionado(null)}
+    onDelete={editor.eliminarEquipo}
+    onMover={editor.iniciarMover}
+    modoMover={editor.modoMover}
+    onSoltar={editor.soltarMover}
+    onCancelarMover={editor.cancelarMover}
+  />
+)}
       <BarraSuperior cargando={editor.cargando} totalEquipos={editor.equipos.length} puedeUndo={editor.puedeUndo} puedeRedo={editor.puedeRedo} indiceActual={editor.indiceRef.current} pasosHistorial={editor.historialRef.current.length} onUndo={editor.manejarUndoLocal} onRedo={editor.manejarRedoLocal} />
       <TooltipSimulacion hoverEquipo={editor.hoverEquipo} estados={editor.estadosSimulacion} />
       

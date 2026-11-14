@@ -1,18 +1,16 @@
-// src/workers/simulacion.worker.ts
-// Motor determinista de simulación (10 Hz)
-// No tiene acceso al DOM ni a Three.js. Solo matemáticas puras.
-
+// src/workers/simulacion.worker.ts — Motor determinista 10 Hz con modo bombeo
 export type EstadoEquipo = {
   uuid: string;
   tag: string;
   familia: string;
-  params: Record<string, number>; // T, P, Nivel, Flujo, RPM
+  params: Record<string, number>;
 };
 
 export type MensajeEntrada = {
-  type: 'INICIAR' | 'ACTUALIZAR_GRAFO';
-  equipos: EstadoEquipo[];
-  dt?: number; // Delta time en segundos
+  type: 'INICIAR' | 'ACTUALIZAR_GRAFO' | 'BOMBEAR';
+  equipos?: EstadoEquipo[];
+  activo?: boolean;
+  dt?: number;
 };
 
 export type MensajeSalida = {
@@ -22,45 +20,48 @@ export type MensajeSalida = {
 };
 
 let equiposState: EstadoEquipo[] = [];
-const PASO_SIMULACION = 0.1; // 10 Hz
+let bombeoActivo = false;
+const PASO = 0.1; // 10 Hz
 
 function simularPaso(dt: number): EstadoEquipo[] {
   return equiposState.map(eq => {
     const nuevo = { ...eq, params: { ...eq.params } };
-    
-    // Lógica simple de proceso (determinista)
-    if (eq.familia === 'tanque') {
-      // Simula llenado/vaciado basado en flujo entrante/saliente
-      const flujoIn = nuevo.params.flujoIn || 0;
-      const flujoOut = nuevo.params.flujoOut || 0;
-      const capacidad = 1000; // Litros base
-      let nivel = nuevo.params.nivel || 50;
-      
-      // Balance de masa simplificado
-      const deltaVolumen = (flujoIn - flujoOut) * dt;
-      nivel = Math.max(0, Math.min(100, nivel + (deltaVolumen / capacidad) * 100));
-      nuevo.params.nivel = parseFloat(nivel.toFixed(2));
-      
-      // Presión hidrostática aproximada
-      nuevo.params.presion = parseFloat((nivel * 0.098).toFixed(3));
-    }
-    
+
     if (eq.familia === 'bomba') {
-      // Simula RPM y presión de descarga
-      const encendida = nuevo.params.encendida ?? true;
-      if (encendida) {
-        nuevo.params.rpm = 1450;
-        nuevo.params.presionDescarga = 3.5;
-      } else {
-        nuevo.params.rpm = 0;
-        nuevo.params.presionDescarga = 0;
-      }
+      nuevo.params.encendida = bombeoActivo ? 1 : 0;
+      nuevo.params.rpm = bombeoActivo ? 1450 : 0;
+      nuevo.params.presion = bombeoActivo ? 3.5 : 0;
+      nuevo.params.flujo = bombeoActivo ? 10 : 0;
     }
-    
+
     if (eq.familia === 'valvula') {
-      // Simula apertura/cierre
-      const abierta = nuevo.params.abierta ?? true;
-      nuevo.params.flujo = abierta ? 10 : 0;
+      nuevo.params.flujo = bombeoActivo ? 10 : 0;
+    }
+
+    if (eq.familia === 'tuberia') {
+      nuevo.params.flujo = bombeoActivo ? 10 : 0;
+    }
+
+    if (eq.familia === 'tanque') {
+      const nivel = nuevo.params.nivel || 50;
+      // Con bombeo, el tanque se llena lentamente hacia 85%; sin bombeo se estabiliza
+      const destino = bombeoActivo ? 85 : 50;
+      nuevo.params.nivel = parseFloat((nivel + (destino - nivel) * 0.02).toFixed(2));
+      nuevo.params.presion = parseFloat((nuevo.params.nivel * 0.098).toFixed(3));
+      nuevo.params.flujo = bombeoActivo ? 10 : 0;
+    }
+
+    if (eq.familia === 'intercambiador') {
+      nuevo.params.flujo = bombeoActivo ? 10 : 0;
+      nuevo.params.presion = bombeoActivo ? 2.1 : 0;
+    }
+
+    if (eq.familia === 'motor') {
+      nuevo.params.rpm = bombeoActivo ? 1780 : 0;
+    }
+
+    if (eq.familia === 'gabinete') {
+      nuevo.params.presion = bombeoActivo ? 480 : 0; // Voltaje simulado
     }
 
     return nuevo;
@@ -68,18 +69,11 @@ function simularPaso(dt: number): EstadoEquipo[] {
 }
 
 self.onmessage = (e: MessageEvent<MensajeEntrada>) => {
-  const { type, equipos, dt = PASO_SIMULACION } = e.data;
-  
-  if (type === 'ACTUALIZAR_GRAFO' && equipos) {
-    equiposState = equipos;
-  }
-  
-  if (type === 'INICIAR' || type === 'ACTUALIZAR_GRAFO') {
-    const resultado = simularPaso(dt);
-    self.postMessage({
-      type: 'ESTADO_ACTUALIZADO',
-      equipos: resultado,
-      timestamp: Date.now()
-    } as MensajeSalida);
-  }
+  const { type, equipos, activo, dt = PASO } = e.data;
+
+  if (type === 'ACTUALIZAR_GRAFO' && equipos) equiposState = equipos;
+  if (type === 'BOMBEAR' && typeof activo === 'boolean') bombeoActivo = activo;
+
+  const resultado = simularPaso(dt);
+  self.postMessage({ type: 'ESTADO_ACTUALIZADO', equipos: resultado, timestamp: Date.now() } as MensajeSalida);
 };
